@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Creating Room</title>
+<meta name="theme-color" content="#141414">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ai:#a6262c; --ai-deep:#141414; --ai-soft:#f5e7e7;
+  --washi:#f2f2f0; --ink:#1c1c1e; --gray:#8a8a8f; --line:#e2e2e0;
+  --white:#ffffff; --radius:8px;
+}
+body::before{content:'';position:fixed;top:0;left:0;right:0;height:3px;background:var(--ai);z-index:100}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--washi);color:var(--ink);font-size:14px;line-height:1.7}
+.serif{font-family:'Shippori Mincho',serif}
+button{font-family:inherit}
+a{color:var(--ai)}
+
+/* ===== Layout ===== */
+.app{display:flex;min-height:100vh}
+.sidebar{
+  width:230px;flex-shrink:0;background:var(--ai-deep);color:#c9c9cc;
+  padding:28px 0 18px;display:flex;flex-direction:column;
+}
+.logo{padding:0 24px 26px;font-family:'Shippori Mincho',serif;color:#fff;font-size:17px;font-weight:600;letter-spacing:.06em}
+.logo small{display:block;font-family:'Noto Sans JP';font-size:10px;color:#8f8f96;letter-spacing:.18em;margin-top:3px}
+.nav-label{font-size:10px;letter-spacing:.2em;padding:14px 24px 6px;color:#77777d}
+.nav-item{
+  padding:9px 24px;cursor:pointer;font-size:13.5px;
+  display:flex;align-items:center;gap:9px;
+  border-left:3px solid transparent;transition:background .15s;
+}
+.nav-item:hover{background:rgba(255,255,255,.06)}
+.nav-item.active{background:rgba(255,255,255,.09);border-left-color:var(--ai);color:#fff}
+.nav-item .dot{width:7px;height:7px;border-radius:50%;background:#5d7393;flex-shrink:0}
+.nav-item.active .dot{background:#fff}
+.nav-item.locked{opacity:.45;cursor:default}
+.nav-item .join-mini{margin-left:auto;font-size:10px;background:var(--ai);color:#fff;border:none;border-radius:10px;padding:2px 10px;cursor:pointer}
+.me{
+  margin-top:auto;padding:18px 24px 0;border-top:1px solid rgba(255,255,255,.1);
+  display:flex;align-items:center;gap:10px;font-size:12.5px;cursor:pointer;
+}
+.avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#a6262c,#c9494f);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;flex-shrink:0}
+.logout{padding:10px 24px 0;font-size:11px;color:#77777d;cursor:pointer}
+.logout:hover{color:#c9c9cc}
+
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{
+  background:var(--white);border-bottom:1px solid var(--line);
+  padding:0 20px;height:58px;display:flex;align-items:center;gap:10px;
+  position:sticky;top:0;z-index:20;
+}
+.hamburger{display:none;background:none;border:none;font-size:20px;cursor:pointer;padding:6px;color:var(--ink)}
+.topbar h1{font-size:16px;font-weight:600;font-family:'Shippori Mincho',serif;letter-spacing:.04em;white-space:nowrap}
+.tabs{display:flex;gap:4px;margin-left:8px;overflow-x:auto}
+.tab{padding:18px 12px;font-size:13px;color:var(--gray);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab.active{color:var(--ai);border-bottom-color:var(--ai);font-weight:600}
+.content{flex:1;overflow-y:auto;padding:24px 20px;-webkit-overflow-scrolling:touch}
+.page{max-width:860px;margin:0 auto}
+
+/* ===== Cards ===== */
+.card{background:var(--white);border:1px solid var(--line);border-radius:var(--radius);padding:22px 24px;margin-bottom:18px}
+.card h3{font-family:'Shippori Mincho',serif;font-size:15px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.card h3 .bar{width:3px;height:16px;background:var(--ai);border-radius:2px;flex-shrink:0}
+.muted{color:var(--gray);font-size:12.5px}
+.empty{color:var(--gray);font-size:13px;text-align:center;padding:30px 0}
+
+/* ===== Pinned ===== */
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:760px){.info-grid{grid-template-columns:1fr}}
+.kv{font-size:13px;margin-bottom:8px;word-break:break-all}
+.kv b{display:inline-block;min-width:110px;color:var(--gray);font-weight:500;font-size:12px}
+.zoom-btn{display:inline-block;margin-top:10px;background:var(--ai);color:#fff;padding:9px 22px;border-radius:6px;font-size:13px;text-decoration:none;font-weight:500}
+.sched li{margin-left:18px;margin-bottom:6px;font-size:13px}
+
+/* ===== Archive ===== */
+.filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.chip{padding:6px 16px;border:1px solid var(--line);border-radius:20px;font-size:12.5px;cursor:pointer;background:var(--white);color:var(--gray)}
+.chip.on{background:var(--ai);border-color:var(--ai);color:#fff}
+.search-box{width:100%;border:1px solid var(--line);border-radius:20px;padding:8px 16px;font-size:13px;font-family:inherit;background:var(--white);outline:none;margin-bottom:16px}
+.search-box:focus{border-color:var(--ai)}
+.video-row{display:flex;align-items:center;gap:14px;background:var(--white);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;text-decoration:none;color:inherit}
+.thumb{width:64px;height:42px;border-radius:6px;flex-shrink:0;background:linear-gradient(135deg,#141414 0%,#4a4a4e 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px}
+.video-info{flex:1;min-width:0}
+.video-title{font-weight:600;font-size:13.5px}
+.video-sub{font-size:11.5px;color:var(--gray);margin-top:2px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.pw{font-size:11px;background:var(--ai-soft);color:var(--ai);padding:2px 10px;border-radius:4px;font-family:monospace;white-space:nowrap;cursor:pointer}
+
+/* ===== Chat ===== */
+.chat-wrap{background:var(--white);border:1px solid var(--line);border-radius:var(--radius);display:flex;flex-direction:column;height:calc(100vh - 160px);min-height:320px}
+.chat-scroll{flex:1;overflow-y:auto;padding:20px 18px}
+.msg{display:flex;gap:10px;margin-bottom:18px}
+.msg .avatar{width:36px;height:36px;font-size:13px}
+.msg-body{flex:1;min-width:0}
+.msg-head{font-size:12px;margin-bottom:3px}
+.msg-head b{font-weight:600}
+.msg-head span{color:var(--gray);font-size:11px;margin-left:8px}
+.msg-text{font-size:13.5px;background:var(--washi);border:1px solid var(--line);border-radius:0 12px 12px 12px;padding:9px 13px;display:inline-block;max-width:92%;white-space:pre-wrap;word-break:break-word}
+.day-divider{text-align:center;margin:16px 0;position:relative}
+.day-divider::before{content:'';position:absolute;left:0;right:0;top:50%;height:1px;background:var(--line)}
+.day-divider span{position:relative;background:var(--white);padding:0 14px;font-size:11px;color:var(--gray)}
+.chat-input{border-top:1px solid var(--line);padding:12px 14px;display:flex;gap:10px;align-items:flex-end}
+.chat-input textarea{
+  flex:1;border:1px solid var(--line);border-radius:18px;padding:9px 16px;resize:none;
+  font-size:13.5px;font-family:inherit;background:var(--washi);outline:none;max-height:120px;line-height:1.5;
+}
+.chat-input textarea:focus{border-color:var(--ai)}
+.send{background:var(--ai);color:#fff;border:none;border-radius:50%;width:38px;height:38px;cursor:pointer;font-size:15px;flex-shrink:0}
+.send:disabled{opacity:.4}
+
+/* ===== Resources ===== */
+.res-item{display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid var(--line);text-decoration:none;color:inherit}
+.res-item:last-child{border:none}
+.res-icon{width:38px;height:38px;border-radius:8px;background:var(--ai-soft);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.res-name{font-weight:600;font-size:13.5px}
+.res-sub{font-size:11.5px;color:var(--gray)}
+
+/* ===== Feed ===== */
+.feed-item{display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--line)}
+.feed-item:last-child{border:none}
+.feed-body{flex:1;min-width:0}
+.feed-meta{font-size:11.5px;color:var(--gray);margin-bottom:2px}
+.feed-meta b{color:var(--ai);font-weight:600}
+.room-chip{display:inline-block;font-size:10px;padding:1px 8px;border-radius:20px;background:var(--ai-soft);color:var(--ai);margin-left:6px;letter-spacing:.05em}
+.feed-text{font-size:13px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+
+/* ===== Login ===== */
+#login{
+  position:fixed;inset:0;background:var(--ai-deep);z-index:50;
+  display:none;align-items:center;justify-content:center;flex-direction:column;
+  background-image:radial-gradient(ellipse at 70% 20%, rgba(166,38,44,.18), transparent 60%);
+  overflow-y:auto;padding:24px 0;
+}
+.login-card{background:var(--white);border-radius:14px;padding:36px 34px;text-align:center;max-width:400px;width:92%;margin:auto}
+.login-card h2{font-family:'Shippori Mincho',serif;font-size:20px;margin-bottom:6px;letter-spacing:.04em}
+.login-card .sub{color:var(--gray);font-size:12.5px;margin-bottom:24px}
+.gbtn{
+  display:flex;align-items:center;justify-content:center;gap:10px;width:100%;
+  border:1px solid var(--line);border-radius:8px;padding:12px;background:#fff;
+  font-size:14px;cursor:pointer;font-weight:500;
+}
+.gbtn:hover{background:var(--washi)}
+.or{display:flex;align-items:center;gap:12px;color:var(--gray);font-size:11px;margin:18px 0}
+.or::before,.or::after{content:'';flex:1;height:1px;background:var(--line)}
+.email-row{display:flex;gap:8px}
+.email-row input{
+  flex:1;border:1px solid var(--line);border-radius:8px;padding:11px 14px;
+  font-size:13.5px;font-family:inherit;outline:none;min-width:0;
+}
+.email-row input:focus{border-color:var(--ai)}
+.email-row button{background:var(--ai);color:#fff;border:none;border-radius:8px;padding:0 18px;font-size:13px;cursor:pointer;white-space:nowrap}
+.login-note{font-size:11px;color:var(--gray);margin-top:16px}
+#magic-sent{display:none;background:var(--ai-soft);color:var(--ai);border-radius:8px;padding:10px 14px;font-size:12.5px;margin-top:14px}
+
+/* ===== Modal ===== */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(20,20,20,.5);z-index:80;align-items:center;justify-content:center;padding:20px}
+.modal{background:#fff;border-radius:12px;padding:28px 30px;max-width:460px;width:100%;max-height:85vh;overflow-y:auto}
+.modal h3{font-family:'Shippori Mincho',serif;font-size:16px;margin-bottom:4px}
+.modal .sub{font-size:12px;color:var(--gray);margin-bottom:16px}
+.role-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.role-table td{padding:8px 0;border-bottom:1px solid var(--line)}
+.role-badge{background:var(--ai-soft);color:var(--ai);padding:1px 8px;border-radius:10px;font-size:11px;white-space:nowrap}
+.role-badge.none{background:#eee;color:var(--gray)}
+.name-input{width:100%;border:1px solid var(--line);border-radius:8px;padding:11px 14px;font-size:14px;font-family:inherit;outline:none;margin:8px 0 14px}
+.name-input:focus{border-color:var(--ai)}
+.primary-btn{background:var(--ai);color:#fff;border:none;border-radius:8px;padding:11px 26px;font-size:13.5px;cursor:pointer;font-weight:500}
+
+/* ===== Toast / spinner ===== */
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ai-deep);color:#fff;padding:10px 22px;border-radius:22px;font-size:12.5px;z-index:200;display:none;max-width:90%}
+#boot{position:fixed;inset:0;background:var(--washi);z-index:40;display:flex;align-items:center;justify-content:center;color:var(--gray);font-size:13px;letter-spacing:.1em}
+
+/* ===== Mobile ===== */
+.sidebar-bg{display:none;position:fixed;inset:0;background:rgba(20,20,20,.4);z-index:29}
+@media(max-width:760px){
+  .hamburger{display:block}
+  .sidebar{
+    position:fixed;top:0;bottom:0;left:0;z-index:30;
+    transform:translateX(-100%);transition:transform .2s ease;width:250px;
+    padding-top:max(28px, env(safe-area-inset-top));
+  }
+  .sidebar.open{transform:translateX(0)}
+  .sidebar-bg.show{display:block}
+  .content{padding:16px 14px}
+  .chat-wrap{height:calc(100dvh - 140px)}
+  .topbar{padding:0 12px}
+}
+</style>
+</head>
+<body>
+
+<div id="boot">Creating Room …</div>
+
+<!-- ===== ログイン ===== -->
+<div id="login">
+  <div class="login-card">
+    <h2>Creating Room</h2>
+    <p class="sub">Creatingスクエアから、それぞれの部屋へ。</p>
+    <button class="gbtn" id="google-btn">
+      <svg width="17" height="17" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.8 6.1C12.3 13.4 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/><path fill="#FBBC05" d="M10.4 28.7c-.5-1.5-.8-3-.8-4.7s.3-3.2.8-4.7l-7.8-6.1C.9 16.5 0 20.1 0 24s.9 7.5 2.6 10.8l7.8-6.1z"/><path fill="#34A853" d="M24 48c6.2 0 11.6-2 15.4-3.6 0 0-7.5-5.8-7.5-5.8-2.1 1.4-4.8 2.3-7.9 2.3-6.3 0-11.7-3.9-13.6-9.3l-7.8 6.1C6.5 42.6 14.6 48 24 48z"/></svg>
+      Google でログイン
+    </button>
+    <div class="or">または</div>
+    <div class="email-row">
+      <input type="email" id="magic-email" placeholder="メールアドレス" autocomplete="email">
+      <button id="magic-btn">送信</button>
+    </div>
+    <div id="magic-sent">ログイン用のリンクをメールに送りました。メールを開いてリンクをタップしてください。</div>
+    <p class="login-note">メールの方はパスワード不要。届いたリンクをタップするだけでログインできます。<br>Facebookアカウントは不要です。</p>
+  </div>
+</div>
+
+<!-- ===== アプリ ===== -->
+<div class="app" id="app" style="display:none">
+  <div class="sidebar-bg" id="sidebar-bg"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="logo">Creating Room<small>ROBERT FRITZ CONSULTING</small></div>
+    <div id="nav"></div>
+    <div class="logout" id="logout-btn">ログアウト</div>
+    <div class="me" id="me-btn">
+      <div class="avatar" id="me-avatar">?</div>
+      <div><span id="me-name">…</span><br><span style="font-size:10.5px;color:#8f8f96" id="me-sub">権限を見る</span></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <button class="hamburger" id="hamburger">☰</button>
+      <h1 id="room-title"></h1>
+      <div class="tabs" id="tabs"></div>
+    </div>
+    <div class="content"><div class="page" id="page"></div></div>
+  </div>
+</div>
+
+<!-- ===== 権限モーダル ===== -->
+<div class="modal-bg" id="role-modal">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3>あなたの権限</h3>
+    <p class="sub" id="role-modal-sub"></p>
+    <table class="role-table" id="role-table"></table>
+    <p style="font-size:11px;color:var(--gray);margin-top:14px">ロールは管理者がいつでも変更できます。</p>
+    <p style="font-size:12px;margin-top:14px"><a href="#" id="edit-name-link">表示名を変更する</a></p>
+  </div>
+</div>
+
+<!-- ===== 名前設定モーダル ===== -->
+<div class="modal-bg" id="name-modal">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:380px">
+    <h3>表示名の設定</h3>
+    <p class="sub">チャットなどで表示される名前です。</p>
+    <input class="name-input" id="name-input" placeholder="例：森山千賀子" maxlength="40">
+    <button class="primary-btn" id="name-save">保存</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="vendor/supabase.js"></script>
+<script>
+/* ================= 設定 ================= */
+if (!window.supabase) { document.getElementById('boot').textContent = '読み込みに失敗しました。再読み込みしてください。'; throw new Error('supabase-js not loaded'); }
+const SUPABASE_URL = 'https://bjicovhhjcyjtpqgscig.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_i9iXMSoR0J-gmHsXxiuL3Q_V29e62aM';
+const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const APP_URL = location.origin + location.pathname;
+
+/* ================= 状態 ================= */
+const S = {
+  user: null, profile: null,
+  rooms: [], memberships: [],   // memberships = 自分の分のみ
+  current: null,                // 表示中: {type:'room', room} or {type:'home'}
+  tab: 'pinned',
+  videos: [], videoFilter: 'すべて', videoSearch: '',
+  profilesCache: {},            // user_id -> display_name
+  chatChannel: null,
+};
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',3500); }
+const JST = {timeZone:'Asia/Tokyo'};
+const fmtTime = iso => new Date(iso).toLocaleTimeString('ja-JP',{...JST,hour:'2-digit',minute:'2-digit'});
+const fmtDay  = iso => new Date(iso).toLocaleDateString('ja-JP',{...JST,month:'numeric',day:'numeric',weekday:'short'});
+const fmtMonth = d => { const [y,m]=String(d).split('-'); return `${y}年${Number(m)}月`; };
+const initialOf = name => (name||'?').trim().slice(0,1).toUpperCase();
+
+/* ================= 認証 ================= */
+$('google-btn').onclick = async () => {
+  const { error } = await supa.auth.signInWithOAuth({ provider:'google', options:{ redirectTo: APP_URL } });
+  if (error) toast('ログインに失敗しました：' + error.message);
+};
+$('magic-btn').onclick = async () => {
+  const email = $('magic-email').value.trim();
+  if (!email) return toast('メールアドレスを入力してください');
+  $('magic-btn').disabled = true;
+  const { error } = await supa.auth.signInWithOtp({ email, options:{ emailRedirectTo: APP_URL } });
+  $('magic-btn').disabled = false;
+  if (error) return toast('送信に失敗しました：' + error.message);
+  $('magic-sent').style.display = 'block';
+};
+$('logout-btn').onclick = async () => { await supa.auth.signOut(); location.reload(); };
+
+supa.auth.onAuthStateChange((_event, session) => {
+  if (session?.user && !S.user) { S.user = session.user; start(); }
+});
+(async () => {
+  const { data:{ session } } = await supa.auth.getSession();
+  $('boot').style.display = 'none';
+  if (session?.user) { S.user = session.user; start(); }
+  else { $('login').style.display = 'flex'; }
+})();
+
+/* ================= 起動 ================= */
+async function start(){
+  $('login').style.display = 'none';
+  $('boot').style.display = 'none';
+  $('app').style.display = 'flex';
+  try {
+    const uid = S.user.id;
+    const [p, r, m] = await Promise.all([
+      supa.from('profiles').select('*').eq('id', uid).single(),
+      supa.from('rooms').select('*').order('sort_order'),
+      supa.from('memberships').select('*').eq('user_id', uid),
+    ]);
+    if (p.error) throw p.error;
+    S.profile = p.data;
+    S.rooms = r.data || [];
+    S.memberships = m.data || [];
+    S.profilesCache[uid] = S.profile.display_name;
+    renderMe(); renderNav();
+    const sccp = S.rooms.find(x => x.slug === 'sccp');
+    if (sccp && isMember(sccp.id)) openRoom(sccp);
+    else if (S.memberships.length) openRoom(S.rooms.find(x => x.id === S.memberships[0].room_id));
+    else openHome();
+    if (!S.profile.display_name || S.profile.display_name.includes('@')) openNameModal();
+  } catch (e) {
+    console.error(e);
+    toast('データの読み込みに失敗しました。ページを再読み込みしてください。');
+  }
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+
+const isMember = roomId => S.memberships.some(m => m.room_id === roomId);
+const roleIn   = roomId => S.memberships.find(m => m.room_id === roomId)?.role || null;
+
+/* ================= サイドバー ================= */
+function renderMe(){
+  $('me-name').textContent = S.profile.display_name || S.profile.email;
+  $('me-avatar').textContent = initialOf(S.profile.display_name);
+  const isAdmin = S.memberships.some(m => m.role === 'admin');
+  $('me-sub').textContent = (isAdmin ? '管理者' : 'メンバー') + ' ・ 権限を見る';
+}
+function renderNav(){
+  const mine   = S.rooms.filter(r => isMember(r.id));
+  const publicR= S.rooms.filter(r => !isMember(r.id) && r.visibility === 'public');
+  const locked = S.rooms.filter(r => !isMember(r.id) && r.visibility !== 'public');
+  let h = `<div class="nav-label">ホーム</div>
+    <div class="nav-item" data-nav="home"><span class="dot"></span>新着フィード</div>`;
+  if (mine.length) {
+    h += `<div class="nav-label">所属ルーム</div>` + mine.map(r =>
+      `<div class="nav-item" data-nav="${r.id}"><span class="dot"></span>${esc(r.name)}</div>`).join('');
+  }
+  if (publicR.length) {
+    h += `<div class="nav-label">参加できるルーム</div>` + publicR.map(r =>
+      `<div class="nav-item" data-join="${r.id}"><span class="dot"></span>${esc(r.name)}<button class="join-mini">参加</button></div>`).join('');
+  }
+  if (locked.length) {
+    h += `<div class="nav-label">その他のプログラム</div>` + locked.map(r =>
+      `<div class="nav-item locked">🔒 ${esc(r.name)}</div>`).join('');
+  }
+  $('nav').innerHTML = h;
+  $('nav').querySelectorAll('[data-nav]').forEach(el => el.onclick = () => {
+    closeSidebar();
+    if (el.dataset.nav === 'home') openHome();
+    else openRoom(S.rooms.find(r => r.id === el.dataset.nav));
+  });
+  $('nav').querySelectorAll('[data-join]').forEach(el => el.onclick = () => joinPublicRoom(el.dataset.join));
+  highlightNav();
+}
+function highlightNav(){
+  const key = S.current?.type === 'home' ? 'home' : S.current?.room?.id;
+  $('nav').querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.nav === key));
+}
+async function joinPublicRoom(roomId){
+  const { error } = await supa.from('memberships').insert({ user_id: S.user.id, room_id: roomId, role: 'member' });
+  if (error) return toast('参加に失敗しました：' + error.message);
+  const { data } = await supa.from('memberships').select('*').eq('user_id', S.user.id);
+  S.memberships = data || S.memberships;
+  renderNav(); renderMe();
+  toast('ルームに参加しました');
+  openRoom(S.rooms.find(r => r.id === roomId));
+}
+
+/* ===== モバイルサイドバー ===== */
+$('hamburger').onclick = () => { $('sidebar').classList.add('open'); $('sidebar-bg').classList.add('show'); };
+function closeSidebar(){ $('sidebar').classList.remove('open'); $('sidebar-bg').classList.remove('show'); }
+$('sidebar-bg').onclick = closeSidebar;
+
+/* ================= ルーム表示 ================= */
+function leaveChat(){ if (S.chatChannel) { supa.removeChannel(S.chatChannel); S.chatChannel = null; } }
+
+function openRoom(room){
+  if (!room) return openHome();
+  leaveChat();
+  S.current = { type:'room', room };
+  $('room-title').textContent = room.name;
+  const tabs = [['pinned','固定情報'],['archive','アーカイブ'],['chat','チャット'],['resources','リソース']];
+  $('tabs').innerHTML = tabs.map(([k,label]) =>
+    `<div class="tab" data-tab="${k}">${label}</div>`).join('');
+  $('tabs').querySelectorAll('.tab').forEach(el => el.onclick = () => showTab(el.dataset.tab));
+  highlightNav();
+  showTab('pinned');
+}
+function showTab(tab){
+  if (S.tab === 'chat' && tab !== 'chat') leaveChat();
+  S.tab = tab;
+  $('tabs').querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
+  ({pinned:renderPinned, archive:renderArchive, chat:renderChat, resources:renderResources})[tab]();
+}
+
+/* ===== 固定情報 ===== */
+function renderPinned(){
+  const p = S.current.room.pinned || {};
+  let h = '';
+  const half = [];
+  if (p.zoom && (p.zoom.meeting_id || p.zoom.url)) {
+    half.push(`<div class="card"><h3><span class="bar"></span>Zoom</h3>
+      ${p.zoom.meeting_id ? `<div class="kv"><b>Meeting ID</b>${esc(p.zoom.meeting_id)}</div>` : ''}
+      ${p.zoom.passcode ? `<div class="kv"><b>Passcode</b>${esc(p.zoom.passcode)}</div>` : ''}
+      ${p.zoom.url ? `<a class="zoom-btn" href="${esc(p.zoom.url)}" target="_blank" rel="noopener">Zoomに参加する</a>` : ''}
+    </div>`);
+  }
+  if (p.contacts?.length) {
+    half.push(`<div class="card"><h3><span class="bar"></span>コンタクト</h3>
+      ${p.contacts.map(c => `<div class="kv"><b>${esc(c.label)}</b>${esc(c.value)}</div>`).join('')}
+    </div>`);
+  }
+  if (half.length) h += `<div class="info-grid">${half.join('')}</div>`;
+  if (p.schedule?.length) {
+    h += `<div class="card"><h3><span class="bar"></span>${esc(p.schedule_title || 'スケジュール')}</h3>
+      <ul class="sched">${p.schedule.map(s => `<li>${esc(s)}</li>`).join('')}</ul>
+      ${p.note ? `<p class="muted" style="margin-top:10px">${esc(p.note)}</p>` : ''}
+    </div>`;
+  } else if (p.note) {
+    h += `<div class="card"><p style="font-size:13px">${esc(p.note)}</p></div>`;
+  }
+  $('page').innerHTML = h || `<div class="empty">固定情報はまだありません</div>`;
+}
+
+/* ===== アーカイブ ===== */
+async function renderArchive(){
+  $('page').innerHTML = `<div class="empty">読み込み中…</div>`;
+  const { data, error } = await supa.from('videos').select('*')
+    .eq('room_id', S.current.room.id).order('session_date', { ascending:false });
+  if (error) { $('page').innerHTML = `<div class="empty">読み込みに失敗しました</div>`; return; }
+  S.videos = data || [];
+  S.videoFilter = 'すべて'; S.videoSearch = '';
+  drawArchive();
+}
+function drawArchive(){
+  const types = ['すべて', ...new Set(S.videos.map(v => v.class_type))];
+  const q = S.videoSearch.trim().toLowerCase();
+  const list = S.videos.filter(v =>
+    (S.videoFilter === 'すべて' || v.class_type === S.videoFilter) &&
+    (!q || (v.title + ' ' + (v.description||'')).toLowerCase().includes(q)));
+  $('page').innerHTML = `
+    <div class="filters">${types.map(t => `<div class="chip ${t===S.videoFilter?'on':''}" data-f="${esc(t)}">${esc(t)}</div>`).join('')}</div>
+    <input class="search-box" id="v-search" placeholder="🔍 概要文で検索…" value="${esc(S.videoSearch)}">
+    ${list.length ? list.map(v => `
+      <a class="video-row" ${v.vimeo_url ? `href="${esc(v.vimeo_url)}" target="_blank" rel="noopener"` : ''}>
+        <div class="thumb">▶</div>
+        <div class="video-info">
+          <div class="video-title">${esc(v.title)}</div>
+          <div class="video-sub">${fmtMonth(v.session_date)}${v.description ? ' ・ ' + esc(v.description) : ''}</div>
+        </div>
+        ${v.password ? `<span class="pw" data-pw="${esc(v.password)}" title="タップでコピー">${esc(v.password)}</span>` : ''}
+      </a>`).join('') : `<div class="empty">該当する動画がありません</div>`}
+  `;
+  $('page').querySelectorAll('[data-f]').forEach(el => el.onclick = () => { S.videoFilter = el.dataset.f; drawArchive(); });
+  const sb = $('v-search');
+  sb.oninput = () => { S.videoSearch = sb.value; clearTimeout(sb._h); sb._h = setTimeout(drawArchive, 250); };
+  sb.onkeydown = e => { if (e.key === 'Enter') e.preventDefault(); };
+  $('page').querySelectorAll('[data-pw]').forEach(el => el.onclick = e => {
+    e.preventDefault(); e.stopPropagation();
+    navigator.clipboard?.writeText(el.dataset.pw).then(() => toast('パスワードをコピーしました'));
+  });
+  // 検索欄にフォーカスを戻す
+  if (q || S.videoSearch) { sb.focus(); sb.setSelectionRange(sb.value.length, sb.value.length); }
+}
+
+/* ===== チャット ===== */
+async function ensureNames(userIds){
+  const missing = [...new Set(userIds)].filter(id => !(id in S.profilesCache));
+  if (!missing.length) return;
+  const { data } = await supa.from('profiles').select('id, display_name').in('id', missing);
+  (data || []).forEach(p => S.profilesCache[p.id] = p.display_name);
+}
+function msgHtml(m){
+  const name = S.profilesCache[m.user_id] || '…';
+  return `<div class="msg" data-mid="${m.id}">
+    <div class="avatar">${esc(initialOf(name))}</div>
+    <div class="msg-body">
+      <div class="msg-head"><b>${esc(name)}</b><span>${fmtTime(m.created_at)}</span></div>
+      <div class="msg-text">${esc(m.content)}</div>
+    </div>
+  </div>`;
+}
+async function renderChat(){
+  $('page').innerHTML = `
+    <div class="chat-wrap">
+      <div class="chat-scroll" id="chat-scroll"><div class="empty">読み込み中…</div></div>
+      <div class="chat-input">
+        <textarea id="chat-text" rows="1" placeholder="${esc(S.current.room.name)}のみんなにメッセージ…"></textarea>
+        <button class="send" id="chat-send">↑</button>
+      </div>
+    </div>`;
+  const roomId = S.current.room.id;
+  const { data, error } = await supa.from('messages').select('*')
+    .eq('room_id', roomId).order('created_at', { ascending:false }).limit(100);
+  const scroll = $('chat-scroll');
+  if (error) { scroll.innerHTML = `<div class="empty">読み込みに失敗しました</div>`; return; }
+  const msgs = (data || []).reverse();
+  await ensureNames(msgs.map(m => m.user_id));
+  let h = '', lastDay = '';
+  for (const m of msgs) {
+    const day = fmtDay(m.created_at);
+    if (day !== lastDay) { h += `<div class="day-divider"><span>${day}</span></div>`; lastDay = day; }
+    h += msgHtml(m);
+  }
+  scroll.innerHTML = h || `<div class="empty">最初のメッセージを送ってみましょう</div>`;
+  scroll.scrollTop = scroll.scrollHeight;
+  scroll.dataset.lastDay = lastDay;
+
+  // リアルタイム購読
+  leaveChat();
+  S.chatChannel = supa.channel('room-' + roomId)
+    .on('postgres_changes',
+      { event:'INSERT', schema:'public', table:'messages', filter:'room_id=eq.' + roomId },
+      async payload => {
+        const m = payload.new;
+        if ($('chat-scroll')?.querySelector(`[data-mid="${m.id}"]`)) return;
+        await ensureNames([m.user_id]);
+        appendMsg(m);
+      })
+    .subscribe();
+
+  // 送信
+  const ta = $('chat-text'), btn = $('chat-send');
+  const doSend = async () => {
+    const text = ta.value.trim();
+    if (!text) return;
+    btn.disabled = true; ta.value = '';
+    const { data: ins, error: e2 } = await supa.from('messages')
+      .insert({ room_id: roomId, user_id: S.user.id, content: text }).select().single();
+    btn.disabled = false;
+    if (e2) { ta.value = text; return toast('送信に失敗しました：' + e2.message); }
+    if (!$('chat-scroll').querySelector(`[data-mid="${ins.id}"]`)) appendMsg(ins);
+    ta.focus();
+  };
+  btn.onclick = doSend;
+  ta.onkeydown = e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); doSend(); } };
+}
+function appendMsg(m){
+  const scroll = $('chat-scroll');
+  if (!scroll) return;
+  scroll.querySelector('.empty')?.remove();
+  const day = fmtDay(m.created_at);
+  const nearBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 120;
+  if (scroll.dataset.lastDay !== day) {
+    scroll.insertAdjacentHTML('beforeend', `<div class="day-divider"><span>${day}</span></div>`);
+    scroll.dataset.lastDay = day;
+  }
+  scroll.insertAdjacentHTML('beforeend', msgHtml(m));
+  if (nearBottom || m.user_id === S.user.id) scroll.scrollTop = scroll.scrollHeight;
+}
+
+/* ===== リソース ===== */
+async function renderResources(){
+  $('page').innerHTML = `<div class="empty">読み込み中…</div>`;
+  const { data, error } = await supa.from('resources').select('*')
+    .eq('room_id', S.current.room.id).order('sort_order');
+  if (error) { $('page').innerHTML = `<div class="empty">読み込みに失敗しました</div>`; return; }
+  if (!data?.length) { $('page').innerHTML = `<div class="empty">リソースはまだありません</div>`; return; }
+  const groups = {};
+  data.forEach(r => (groups[r.category] = groups[r.category] || []).push(r));
+  $('page').innerHTML = Object.entries(groups).map(([cat, items]) => `
+    <div class="card"><h3><span class="bar"></span>${esc(cat)}</h3>
+      ${items.map(r => `
+        <a class="res-item" ${r.url ? `href="${esc(r.url)}" target="_blank" rel="noopener"` : ''}>
+          <div class="res-icon">${esc(r.icon || '📄')}</div>
+          <div><div class="res-name">${esc(r.title)}</div>
+          ${r.subtitle ? `<div class="res-sub">${esc(r.subtitle)}</div>` : ''}</div>
+        </a>`).join('')}
+    </div>`).join('');
+}
+
+/* ================= ホーム（新着フィード） ================= */
+async function openHome(){
+  leaveChat();
+  S.current = { type:'home' };
+  $('room-title').textContent = 'ホーム';
+  $('tabs').innerHTML = '';
+  highlightNav();
+  if (!S.memberships.length) {
+    $('page').innerHTML = `<div class="card">
+      <h3><span class="bar"></span>ようこそ、Creating Roomへ</h3>
+      <p style="font-size:13px">まだ参加しているルームがありません。プログラム参加者の方は、管理者による登録をお待ちください。左のメニューに「参加できるルーム」がある場合は、そこから参加できます。</p>
+    </div>`;
+    return;
+  }
+  $('page').innerHTML = `<div class="empty">読み込み中…</div>`;
+  const roomName = id => S.rooms.find(r => r.id === id)?.name || '';
+  const [msgs, vids] = await Promise.all([
+    supa.from('messages').select('*').order('created_at', { ascending:false }).limit(10),
+    supa.from('videos').select('*').order('created_at', { ascending:false }).limit(5),
+  ]);
+  const items = [
+    ...(msgs.data || []).map(m => ({ t:m.created_at, kind:'msg', m })),
+    ...(vids.data || []).map(v => ({ t:v.created_at, kind:'vid', v })),
+  ].sort((a,b) => b.t < a.t ? -1 : 1).slice(0, 12);
+  await ensureNames(items.filter(i => i.kind==='msg').map(i => i.m.user_id));
+  $('page').innerHTML = `<div class="card"><h3><span class="bar"></span>新着</h3>
+    ${items.length ? items.map(i => i.kind === 'msg' ? `
+      <div class="feed-item">
+        <div class="avatar">${esc(initialOf(S.profilesCache[i.m.user_id]))}</div>
+        <div class="feed-body">
+          <div class="feed-meta"><b>${esc(S.profilesCache[i.m.user_id] || '')}</b>がチャットに投稿<span class="room-chip">${esc(roomName(i.m.room_id))}</span> ・ ${fmtDay(i.t)} ${fmtTime(i.t)}</div>
+          <div class="feed-text">${esc(i.m.content)}</div>
+        </div>
+      </div>` : `
+      <div class="feed-item">
+        <div class="avatar">▶</div>
+        <div class="feed-body">
+          <div class="feed-meta">アーカイブに追加<span class="room-chip">${esc(roomName(i.v.room_id))}</span> ・ ${fmtDay(i.t)}</div>
+          <div class="feed-text">🎥 ${esc(i.v.title)}</div>
+        </div>
+      </div>`).join('') : `<div class="empty">まだ新着はありません</div>`}
+  </div>
+  <p class="muted">所属している全ルームの新着がここにまとまります。</p>`;
+}
+
+/* ================= 権限モーダル ================= */
+$('me-btn').onclick = () => {
+  $('role-modal-sub').textContent = `${S.profile.display_name || ''} ・ ${S.profile.email || ''}`;
+  $('role-table').innerHTML = `
+    <tr style="color:var(--gray);font-size:11px"><td>ルーム</td><td>ロール</td><td>できること</td></tr>` +
+    S.rooms.map(r => {
+      const role = roleIn(r.id);
+      const label = role === 'admin' ? '管理者' : role === 'member' ? 'メンバー' : '未所属';
+      const can = role === 'admin' ? '閲覧・投稿・編集・メンバー管理' : role === 'member' ? '閲覧・投稿' : '—';
+      return `<tr><td><b>${esc(r.name)}</b></td>
+        <td><span class="role-badge ${role ? '' : 'none'}">${label}</span></td>
+        <td style="font-size:11.5px">${can}</td></tr>`;
+    }).join('');
+  $('role-modal').style.display = 'flex';
+};
+$('role-modal').onclick = () => $('role-modal').style.display = 'none';
+$('edit-name-link').onclick = e => { e.preventDefault(); $('role-modal').style.display = 'none'; openNameModal(); };
+
+/* ===== 表示名 ===== */
+function openNameModal(){
+  $('name-input').value = (S.profile.display_name && !S.profile.display_name.includes('@')) ? S.profile.display_name : '';
+  $('name-modal').style.display = 'flex';
+}
+$('name-modal').onclick = () => { if (S.profile.display_name) $('name-modal').style.display = 'none'; };
+$('name-save').onclick = async () => {
+  const name = $('name-input').value.trim();
+  if (!name) return toast('名前を入力してください');
+  const { error } = await supa.from('profiles').update({ display_name: name }).eq('id', S.user.id);
+  if (error) return toast('保存に失敗しました：' + error.message);
+  S.profile.display_name = name;
+  S.profilesCache[S.user.id] = name;
+  renderMe();
+  $('name-modal').style.display = 'none';
+  toast('表示名を保存しました');
+};
+</script>
+</body>
+</html>
