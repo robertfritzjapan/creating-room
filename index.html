@@ -105,6 +105,11 @@ a{color:var(--ai)}
 .msg-head b{font-weight:600}
 .msg-head span{color:var(--gray);font-size:11px;margin-left:8px}
 .msg-text{font-size:13.5px;background:var(--washi);border:1px solid var(--line);border-radius:0 12px 12px 12px;padding:9px 13px;display:inline-block;max-width:92%;white-space:pre-wrap;word-break:break-word}
+.msg.mine{flex-direction:row-reverse}
+.msg.mine .msg-body{display:flex;flex-direction:column;align-items:flex-end}
+.msg.mine .msg-head span{margin-left:0;margin-right:8px}
+.msg.mine .msg-text{background:var(--ai);color:#fff;border:none;border-radius:12px 0 12px 12px}
+.msg.mine .avatar{background:linear-gradient(135deg,#3a3a3c,#6b6b70)}
 .day-divider{text-align:center;margin:16px 0;position:relative}
 .day-divider::before{content:'';position:absolute;left:0;right:0;top:50%;height:1px;background:var(--line)}
 .day-divider span{position:relative;background:var(--white);padding:0 14px;font-size:11px;color:var(--gray)}
@@ -506,10 +511,11 @@ async function ensureNames(userIds){
 }
 function msgHtml(m){
   const name = S.profilesCache[m.user_id] || '…';
-  return `<div class="msg" data-mid="${m.id}">
+  const mine = m.user_id === S.user.id;
+  return `<div class="msg ${mine ? 'mine' : ''}" data-mid="${m.id}">
     <div class="avatar">${esc(initialOf(name))}</div>
     <div class="msg-body">
-      <div class="msg-head"><b>${esc(name)}</b><span>${fmtTime(m.created_at)}</span></div>
+      <div class="msg-head">${mine ? `<span>${fmtTime(m.created_at)}</span><b>${esc(name)}</b>` : `<b>${esc(name)}</b><span>${fmtTime(m.created_at)}</span>`}</div>
       <div class="msg-text">${esc(m.content)}</div>
     </div>
   </div>`;
