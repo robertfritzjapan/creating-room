@@ -271,6 +271,47 @@ a{color:var(--ai)}
   </div>
 </div>
 
+<!-- ===== 基本情報編集モーダル（管理者・編集者） ===== -->
+<div class="modal-bg" id="info-modal">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:460px">
+    <h3>基本情報を編集</h3>
+    <p class="sub" id="info-modal-room"></p>
+    <label class="form-label">Zoom Meeting ID</label>
+    <input class="form-input" id="inf-zoom-id" placeholder="例：846 0238 4284">
+    <label class="form-label">Zoom Passcode</label>
+    <input class="form-input" id="inf-zoom-pass" placeholder="例：373668">
+    <label class="form-label">ZoomリンクURL</label>
+    <input class="form-input" id="inf-zoom-url" placeholder="https://…zoom.us/j/…">
+    <label class="form-label">コンタクト（1行に1件、「名目：宛先」の形で）</label>
+    <textarea class="form-input" id="inf-contacts" rows="3" placeholder="個人セッションレポート：support@robertfritzjapan.com"></textarea>
+    <label class="form-label">スケジュールの見出し</label>
+    <input class="form-input" id="inf-sched-title" placeholder="例：2025年11月–2026年10月 スケジュール">
+    <label class="form-label">スケジュール（1行に1件）</label>
+    <textarea class="form-input" id="inf-sched" rows="4"></textarea>
+    <label class="form-label">補足メモ</label>
+    <textarea class="form-input" id="inf-note" rows="2"></textarea>
+    <div style="margin-top:20px"><button class="primary-btn" id="info-save">保存する</button></div>
+  </div>
+</div>
+
+<!-- ===== セクション編集モーダル（管理者・編集者） ===== -->
+<div class="modal-bg" id="sec-modal">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:480px">
+    <h3 id="sec-modal-title">セクションを追加</h3>
+    <p class="sub">見出し＋本文の自由なブロックです。本文にはURLや画像を入れられます。</p>
+    <label class="form-label">見出し（任意）</label>
+    <input class="form-input" id="sec-title" placeholder="例：はじめての方へ">
+    <label class="form-label">本文（URLは自動でリンクに、画像URLだけの行は画像として表示されます）</label>
+    <textarea class="form-input" id="sec-body" rows="9" placeholder="ここに自由に書けます。&#10;&#10;改行もそのまま反映されます。"></textarea>
+    <div style="margin-top:10px">
+      <input type="file" id="sec-img-file" accept="image/*" style="display:none">
+      <button class="add-res-btn" style="margin-bottom:0" id="sec-img-btn">🖼 画像をアップロードして挿入</button>
+      <span class="muted" id="sec-img-status"></span>
+    </div>
+    <div style="margin-top:20px"><button class="primary-btn" id="sec-save">保存する</button></div>
+  </div>
+</div>
+
 <!-- ===== 動画追加・編集モーダル（管理者・編集者） ===== -->
 <div class="modal-bg" id="vid-modal">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:440px">
@@ -512,9 +553,24 @@ function showTab(tab){
 }
 
 /* ===== 固定情報 ===== */
+function richText(t){
+  return esc(t || '').split('\n').map(line => {
+    const l = line.trim();
+    if (/^https?:\/\/\S+$/.test(l) &&
+        (/\.(png|jpe?g|gif|webp|svg)(\?|#|$)/i.test(l) || l.includes('/room-media/'))) {
+      return `<img src="${l}" alt="" style="max-width:100%;border-radius:8px;margin:8px 0" loading="lazy">`;
+    }
+    return line.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+  }).join('<br>');
+}
 function renderPinned(){
-  const p = S.current.room.pinned || {};
-  let h = '';
+  const room = S.current.room;
+  const p = room.pinned || {};
+  const editor = canEdit(room.id);
+  let h = editor ? `<div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="add-res-btn" style="margin-bottom:0" id="edit-info">✏️ 基本情報を編集</button>
+      <button class="add-res-btn" style="margin-bottom:0" id="add-sec">＋ セクションを追加</button>
+    </div>` : '';
   const half = [];
   if (p.zoom && (p.zoom.meeting_id || p.zoom.url)) {
     half.push(`<div class="card"><h3><span class="bar"></span>Zoom</h3>
@@ -537,8 +593,110 @@ function renderPinned(){
   } else if (p.note) {
     h += `<div class="card"><p style="font-size:13px">${esc(p.note)}</p></div>`;
   }
+  (p.sections || []).forEach((s, idx) => {
+    const btns = editor
+      ? `<span style="margin-left:auto;flex-shrink:0"><button class="res-del" data-sedit="${idx}" title="編集">✏️</button><button class="res-del" data-sdel="${idx}" title="削除">✕</button></span>`
+      : '';
+    h += `<div class="card">
+      <h3><span class="bar"></span>${esc(s.title || '')}${btns}</h3>
+      <div style="font-size:13.5px">${richText(s.body)}</div>
+    </div>`;
+  });
   $('page').innerHTML = h || `<div class="empty">固定情報はまだありません</div>`;
+  const ei = $('edit-info'); if (ei) ei.onclick = openInfoModal;
+  const as = $('add-sec'); if (as) as.onclick = () => openSecModal(null);
+  $('page').querySelectorAll('[data-sedit]').forEach(el => el.onclick = () => openSecModal(Number(el.dataset.sedit)));
+  $('page').querySelectorAll('[data-sdel]').forEach(el => el.onclick = async () => {
+    if (!confirm('このセクションを削除しますか？')) return;
+    const pinned = structuredClone(S.current.room.pinned || {});
+    (pinned.sections || []).splice(Number(el.dataset.sdel), 1);
+    if (await savePinned(pinned)) { toast('削除しました'); renderPinned(); }
+  });
 }
+async function savePinned(pinned){
+  const { error } = await supa.from('rooms').update({ pinned }).eq('id', S.current.room.id);
+  if (error) { toast('保存に失敗しました：' + error.message); return false; }
+  S.current.room.pinned = pinned;
+  const r = S.rooms.find(x => x.id === S.current.room.id);
+  if (r) r.pinned = pinned;
+  return true;
+}
+
+/* ===== 基本情報の編集 ===== */
+function openInfoModal(){
+  const p = S.current.room.pinned || {};
+  $('info-modal-room').textContent = S.current.room.name;
+  $('inf-zoom-id').value = p.zoom?.meeting_id || '';
+  $('inf-zoom-pass').value = p.zoom?.passcode || '';
+  $('inf-zoom-url').value = p.zoom?.url || '';
+  $('inf-contacts').value = (p.contacts || []).map(c => `${c.label}：${c.value}`).join('\n');
+  $('inf-sched-title').value = p.schedule_title || '';
+  $('inf-sched').value = (p.schedule || []).join('\n');
+  $('inf-note').value = p.note || '';
+  $('info-modal').style.display = 'flex';
+}
+$('info-modal').onclick = () => $('info-modal').style.display = 'none';
+$('info-save').onclick = async () => {
+  const pinned = structuredClone(S.current.room.pinned || {});
+  const zid = $('inf-zoom-id').value.trim(), zpass = $('inf-zoom-pass').value.trim(), zurl = $('inf-zoom-url').value.trim();
+  pinned.zoom = (zid || zpass || zurl) ? { meeting_id: zid, passcode: zpass, url: zurl } : undefined;
+  pinned.contacts = $('inf-contacts').value.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+    const m = l.match(/^(.*?)[：:]\s*(.*)$/);
+    return m ? { label: m[1].trim(), value: m[2].trim() } : { label: '', value: l };
+  });
+  pinned.schedule_title = $('inf-sched-title').value.trim();
+  pinned.schedule = $('inf-sched').value.split('\n').map(l => l.trim()).filter(Boolean);
+  pinned.note = $('inf-note').value.trim();
+  if (pinned.zoom === undefined) delete pinned.zoom;
+  if (await savePinned(pinned)) {
+    $('info-modal').style.display = 'none';
+    toast('基本情報を保存しました');
+    renderPinned();
+  }
+};
+
+/* ===== セクションの追加・編集 ===== */
+function openSecModal(idx){
+  S.editingSecIdx = idx;
+  const s = idx !== null ? (S.current.room.pinned?.sections || [])[idx] : null;
+  $('sec-modal-title').textContent = s ? 'セクションを編集' : 'セクションを追加';
+  $('sec-title').value = s?.title || '';
+  $('sec-body').value = s?.body || '';
+  $('sec-img-status').textContent = '';
+  $('sec-modal').style.display = 'flex';
+}
+$('sec-modal').onclick = () => $('sec-modal').style.display = 'none';
+$('sec-img-btn').onclick = () => $('sec-img-file').click();
+$('sec-img-file').onchange = async () => {
+  const file = $('sec-img-file').files[0];
+  if (!file) return;
+  $('sec-img-status').textContent = 'アップロード中…';
+  const path = `${S.current.room.slug}/${Date.now()}-${file.name.replace(/[^\w.\-]+/g, '_')}`;
+  const { error } = await supa.storage.from('room-media').upload(path, file);
+  if (error) { $('sec-img-status').textContent = ''; return toast('画像のアップロードに失敗しました：' + error.message); }
+  const { data } = supa.storage.from('room-media').getPublicUrl(path);
+  const ta = $('sec-body');
+  ta.value = (ta.value ? ta.value.replace(/\n*$/, '\n\n') : '') + data.publicUrl + '\n';
+  $('sec-img-status').textContent = '✓ 挿入しました';
+  $('sec-img-file').value = '';
+};
+$('sec-save').onclick = async () => {
+  const title = $('sec-title').value.trim();
+  const body = $('sec-body').value.trim();
+  if (!title && !body) return toast('見出しか本文のどちらかは入力してください');
+  const pinned = structuredClone(S.current.room.pinned || {});
+  pinned.sections = pinned.sections || [];
+  if (S.editingSecIdx !== null && pinned.sections[S.editingSecIdx]) {
+    pinned.sections[S.editingSecIdx] = { title, body };
+  } else {
+    pinned.sections.push({ title, body });
+  }
+  if (await savePinned(pinned)) {
+    $('sec-modal').style.display = 'none';
+    toast('保存しました');
+    renderPinned();
+  }
+};
 
 /* ===== アーカイブ ===== */
 async function renderArchive(){
