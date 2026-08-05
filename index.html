@@ -402,7 +402,7 @@ async function start(){
     const sccp = S.rooms.find(x => x.slug === 'sccp');
     if (defRoom) openRoom(defRoom);
     else if (sccp && isMember(sccp.id)) openRoom(sccp);
-    else if (S.memberships.length) openRoom(S.rooms.find(x => x.id === S.memberships[0].room_id));
+    else if (S.memberships.length) openRoom(S.rooms.find(x => isMember(x.id)));  // sort_order順で最初の所属ルーム（＝玄関）
     else openHome();
     if (!S.profile.display_name || S.profile.display_name.includes('@')) openNameModal();
   } catch (e) {
@@ -805,7 +805,7 @@ async function openHome(){
   $('page').innerHTML = `<div class="empty">読み込み中…</div>`;
   const roomName = id => S.rooms.find(r => r.id === id)?.name || '';
   const [msgs, vids] = await Promise.all([
-    supa.from('messages').select('*').order('created_at', { ascending:false }).limit(10),
+    supa.from('messages').select('*').neq('user_id', S.user.id).order('created_at', { ascending:false }).limit(10),
     supa.from('videos').select('*').order('created_at', { ascending:false }).limit(5),
   ]);
   const items = [
