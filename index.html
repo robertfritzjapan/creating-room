@@ -90,7 +90,11 @@ a{color:var(--ai)}
 .chip.on{background:var(--ai);border-color:var(--ai);color:#fff}
 .search-box{width:100%;border:1px solid var(--line);border-radius:20px;padding:8px 16px;font-size:13px;font-family:inherit;background:var(--white);outline:none;margin-bottom:16px}
 .search-box:focus{border-color:var(--ai)}
-.video-row{display:flex;align-items:center;gap:14px;background:var(--white);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;text-decoration:none;color:inherit}
+.video-row{display:flex;align-items:center;gap:14px;background:var(--white);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;text-decoration:none;color:inherit;cursor:pointer}
+.video-row.open{align-items:flex-start}
+.video-row.open .video-sub{display:block;-webkit-line-clamp:unset;overflow:visible;white-space:pre-line}
+.video-open-link{display:none;margin-top:10px;font-size:12.5px}
+.video-row.open .video-open-link{display:inline-block;background:var(--ai);color:#fff;padding:7px 18px;border-radius:6px;text-decoration:none;font-weight:500}
 .thumb{width:64px;height:42px;border-radius:6px;flex-shrink:0;background:linear-gradient(135deg,#141414 0%,#4a4a4e 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px}
 .video-info{flex:1;min-width:0}
 .video-title{font-weight:600;font-size:13.5px}
@@ -267,6 +271,28 @@ a{color:var(--ai)}
   </div>
 </div>
 
+<!-- ===== 動画追加・編集モーダル（管理者・編集者） ===== -->
+<div class="modal-bg" id="vid-modal">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:440px">
+    <h3 id="vid-modal-title">動画を追加</h3>
+    <p class="sub" id="vid-modal-room"></p>
+    <label class="form-label">タイトル</label>
+    <input class="form-input" id="vid-title" placeholder="例：ロバートクラス 8/15">
+    <label class="form-label">クラス種別（フィルタのチップになります）</label>
+    <input class="form-input" id="vid-type" list="vid-type-list" placeholder="例：ロバートクラス">
+    <datalist id="vid-type-list"></datalist>
+    <label class="form-label">実施日</label>
+    <input class="form-input" id="vid-date" type="date">
+    <label class="form-label">Vimeoリンク</label>
+    <input class="form-input" id="vid-url" placeholder="https://vimeo.com/…">
+    <label class="form-label">パスワード（任意）</label>
+    <input class="form-input" id="vid-pw" placeholder="例：SCCP-0815">
+    <label class="form-label">概要（任意・検索対象になります）</label>
+    <textarea class="form-input" id="vid-desc" rows="4" placeholder="クラスの内容、扱ったテーマなど"></textarea>
+    <div style="margin-top:20px"><button class="primary-btn" id="vid-save">保存する</button></div>
+  </div>
+</div>
+
 <!-- ===== リソース追加モーダル（管理者） ===== -->
 <div class="modal-bg" id="res-modal">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:420px">
@@ -388,13 +414,15 @@ async function start(){
 
 const isMember = roomId => S.memberships.some(m => m.room_id === roomId);
 const roleIn   = roomId => S.memberships.find(m => m.room_id === roomId)?.role || null;
+const canEdit  = roomId => ['admin', 'editor'].includes(roleIn(roomId));
 
 /* ================= サイドバー ================= */
 function renderMe(){
   $('me-name').textContent = S.profile.display_name || S.profile.email;
   $('me-avatar').textContent = initialOf(S.profile.display_name);
-  const isAdmin = S.memberships.some(m => m.role === 'admin');
-  $('me-sub').textContent = (isAdmin ? '管理者' : 'メンバー') + ' ・ 権限を見る';
+  const top = S.memberships.some(m => m.role === 'admin') ? '管理者'
+    : S.memberships.some(m => m.role === 'editor') ? '編集者' : 'メンバー';
+  $('me-sub').textContent = top + ' ・ 権限を見る';
 }
 function renderNav(){
   const mine   = S.rooms.filter(r => isMember(r.id));
@@ -524,22 +552,44 @@ async function renderArchive(){
 function drawArchive(){
   const types = ['すべて', ...new Set(S.videos.map(v => v.class_type))];
   const q = S.videoSearch.trim().toLowerCase();
+  const editor = canEdit(S.current.room.id);
   const list = S.videos.filter(v =>
     (S.videoFilter === 'すべて' || v.class_type === S.videoFilter) &&
     (!q || (v.title + ' ' + (v.description||'')).toLowerCase().includes(q)));
   $('page').innerHTML = `
+    ${editor ? `<button class="add-res-btn" id="add-vid">＋ 動画を追加</button>` : ''}
     <div class="filters">${types.map(t => `<div class="chip ${t===S.videoFilter?'on':''}" data-f="${esc(t)}">${esc(t)}</div>`).join('')}</div>
     <input class="search-box" id="v-search" placeholder="🔍 概要文で検索…" value="${esc(S.videoSearch)}">
     ${list.length ? list.map(v => `
-      <a class="video-row" ${v.vimeo_url ? `href="${esc(v.vimeo_url)}" target="_blank" rel="noopener"` : ''}>
-        <div class="thumb">▶</div>
+      <div class="video-row" data-vrow="${v.id}">
+        ${v.vimeo_url ? `<a class="thumb" href="${esc(v.vimeo_url)}" target="_blank" rel="noopener" title="動画を開く">▶</a>` : `<div class="thumb">▶</div>`}
         <div class="video-info">
           <div class="video-title">${esc(v.title)}</div>
           <div class="video-sub">${fmtMonth(v.session_date)}${v.description ? ' ・ ' + esc(v.description) : ''}</div>
+          ${v.vimeo_url ? `<a class="video-open-link" href="${esc(v.vimeo_url)}" target="_blank" rel="noopener">▶ 動画を開く</a>` : ''}
         </div>
         ${v.password ? `<span class="pw" data-pw="${esc(v.password)}" title="タップでコピー">${esc(v.password)}</span>` : ''}
-      </a>`).join('') : `<div class="empty">該当する動画がありません</div>`}
+        ${editor ? `<button class="res-del" data-vedit="${v.id}" title="編集">✏️</button><button class="res-del" data-vdel="${v.id}" title="削除">✕</button>` : ''}
+      </div>`).join('') : `<div class="empty">該当する動画がありません</div>`}
   `;
+  $('page').querySelectorAll('[data-vrow]').forEach(el => el.onclick = e => {
+    if (e.target.closest('a, button, [data-pw]')) return;   // リンク・ボタン類は素通し
+    el.classList.toggle('open');
+  });
+  const avb = $('add-vid');
+  if (avb) avb.onclick = () => openVidModal(null);
+  $('page').querySelectorAll('[data-vedit]').forEach(el => el.onclick = e => {
+    e.preventDefault(); e.stopPropagation();
+    openVidModal(S.videos.find(v => v.id === el.dataset.vedit));
+  });
+  $('page').querySelectorAll('[data-vdel]').forEach(el => el.onclick = async e => {
+    e.preventDefault(); e.stopPropagation();
+    if (!confirm('この動画をアーカイブから削除しますか？')) return;
+    const { error } = await supa.from('videos').delete().eq('id', el.dataset.vdel);
+    if (error) return toast('削除に失敗しました：' + error.message);
+    toast('削除しました');
+    renderArchive();
+  });
   $('page').querySelectorAll('[data-f]').forEach(el => el.onclick = () => { S.videoFilter = el.dataset.f; drawArchive(); });
   const sb = $('v-search');
   sb.oninput = () => { S.videoSearch = sb.value; clearTimeout(sb._h); sb._h = setTimeout(drawArchive, 250); };
@@ -648,7 +698,7 @@ async function renderResources(){
   const { data, error } = await supa.from('resources').select('*')
     .eq('room_id', S.current.room.id).order('sort_order');
   if (error) { $('page').innerHTML = `<div class="empty">読み込みに失敗しました</div>`; return; }
-  const isAdmin = roleIn(S.current.room.id) === 'admin';
+  const isAdmin = canEdit(S.current.room.id);
   S.resCats = [...new Set((data || []).map(r => r.category))];
   const addBtn = isAdmin ? `<button class="add-res-btn" id="add-res">＋ リソースを追加</button>` : '';
   if (!data?.length) {
@@ -678,6 +728,40 @@ async function renderResources(){
     renderResources();
   });
 }
+/* ===== 動画の追加・編集（管理者・編集者） ===== */
+function openVidModal(v){
+  S.editingVideo = v || null;
+  $('vid-modal-title').textContent = v ? '動画を編集' : '動画を追加';
+  $('vid-modal-room').textContent = S.current.room.name + ' のアーカイブ';
+  $('vid-type-list').innerHTML = [...new Set(S.videos.map(x => x.class_type))].map(t => `<option value="${esc(t)}">`).join('');
+  $('vid-title').value = v?.title || '';
+  $('vid-type').value = v?.class_type || '';
+  $('vid-date').value = v?.session_date || '';
+  $('vid-url').value = v?.vimeo_url || '';
+  $('vid-pw').value = v?.password || '';
+  $('vid-desc').value = v?.description || '';
+  $('vid-modal').style.display = 'flex';
+}
+$('vid-modal').onclick = () => $('vid-modal').style.display = 'none';
+$('vid-save').onclick = async () => {
+  const title = $('vid-title').value.trim(), type = $('vid-type').value.trim(), date = $('vid-date').value;
+  if (!title || !type || !date) return toast('タイトル・クラス種別・実施日は必須です');
+  const row = {
+    title, class_type: type, session_date: date,
+    vimeo_url: $('vid-url').value.trim() || null,
+    password: $('vid-pw').value.trim() || null,
+    description: $('vid-desc').value.trim() || null,
+  };
+  const q = S.editingVideo
+    ? supa.from('videos').update(row).eq('id', S.editingVideo.id)
+    : supa.from('videos').insert({ ...row, room_id: S.current.room.id });
+  const { error } = await q;
+  if (error) return toast('保存に失敗しました：' + error.message);
+  $('vid-modal').style.display = 'none';
+  toast(S.editingVideo ? '動画を更新しました' : '動画を追加しました');
+  renderArchive();
+};
+
 function openResModal(){
   $('res-modal-room').textContent = S.current.room.name + ' のリソースに追加されます';
   $('res-cat-list').innerHTML = (S.resCats || []).map(c => `<option value="${esc(c)}">`).join('');
@@ -756,8 +840,10 @@ $('me-btn').onclick = () => {
     <tr style="color:var(--gray);font-size:11px"><td>ルーム</td><td>ロール</td><td>できること</td></tr>` +
     S.rooms.map(r => {
       const role = roleIn(r.id);
-      const label = role === 'admin' ? '管理者' : role === 'member' ? 'メンバー' : '未所属';
-      const can = role === 'admin' ? '閲覧・投稿・編集・メンバー管理' : role === 'member' ? '閲覧・投稿' : '—';
+      const label = role === 'admin' ? '管理者' : role === 'editor' ? '編集者' : role === 'member' ? 'メンバー' : '未所属';
+      const can = role === 'admin' ? '閲覧・投稿・編集・メンバー管理'
+        : role === 'editor' ? '閲覧・投稿・動画やリソースの追加編集'
+        : role === 'member' ? '閲覧・投稿' : '—';
       return `<tr><td><b>${esc(r.name)}</b></td>
         <td><span class="role-badge ${role ? '' : 'none'}">${label}</span></td>
         <td style="font-size:11.5px">${can}</td></tr>`;
