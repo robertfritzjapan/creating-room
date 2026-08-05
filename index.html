@@ -497,6 +497,7 @@ function openRoom(room){
   $('room-title').textContent = room.name;
   updatePinBtn();
   const tabs = [['pinned','固定情報'],['archive','アーカイブ'],['chat','チャット'],['resources','リソース']];
+  if (roleIn(room.id) === 'admin') tabs.push(['members','メンバー']);
   $('tabs').innerHTML = tabs.map(([k,label]) =>
     `<div class="tab" data-tab="${k}">${label}</div>`).join('');
   $('tabs').querySelectorAll('.tab').forEach(el => el.onclick = () => showTab(el.dataset.tab));
@@ -507,7 +508,7 @@ function showTab(tab){
   if (S.tab === 'chat' && tab !== 'chat') leaveChat();
   S.tab = tab;
   $('tabs').querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
-  ({pinned:renderPinned, archive:renderArchive, chat:renderChat, resources:renderResources})[tab]();
+  ({pinned:renderPinned, archive:renderArchive, chat:renderChat, resources:renderResources, members:renderMembers})[tab]();
 }
 
 /* ===== 固定情報 ===== */
@@ -786,6 +787,104 @@ $('res-save').onclick = async () => {
   toast('リソースを追加しました');
   renderResources();
 };
+
+/* ===== メンバー管理（管理者のみ） ===== */
+const ROLE_LABELS = { member:'メンバー', editor:'編集者', admin:'管理者' };
+function roleSelect(cur, attr){
+  return `<select class="form-input" style="width:auto;padding:6px 10px;font-size:12.5px" ${attr}>
+    ${['member','editor','admin'].map(r => `<option value="${r}" ${r===cur?'selected':''}>${ROLE_LABELS[r]}</option>`).join('')}
+  </select>`;
+}
+async function renderMembers(){
+  $('page').innerHTML = `<div class="empty">読み込み中…</div>`;
+  const roomId = S.current.room.id;
+  const [mRes, iRes] = await Promise.all([
+    supa.from('memberships').select('*').eq('room_id', roomId),
+    supa.from('room_invitations').select('*').eq('room_id', roomId).is('claimed_at', null),
+  ]);
+  if (mRes.error) { $('page').innerHTML = `<div class="empty">読み込みに失敗しました</div>`; return; }
+  const members = mRes.data || [];
+  const { data: profs } = members.length
+    ? await supa.from('profiles').select('id, email, display_name').in('id', members.map(m => m.user_id))
+    : { data: [] };
+  const pmap = {}; (profs || []).forEach(p => pmap[p.id] = p);
+  members.sort((a,b) => (pmap[a.user_id]?.display_name || '').localeCompare(pmap[b.user_id]?.display_name || '', 'ja'));
+  const invites = iRes.data || [];
+  $('page').innerHTML = `
+    <div class="card"><h3><span class="bar"></span>招待する</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input class="form-input" id="inv-email" placeholder="メールアドレス（Googleログインに使うもの）" style="flex:1;min-width:220px">
+        ${roleSelect('member', 'id="inv-role"')}
+        <button class="primary-btn" id="inv-add">追加</button>
+      </div>
+      <p class="muted" style="margin-top:8px">ログイン済みの人はすぐメンバーになります。まだの人は「招待中」に入り、初回ログイン時に自動で参加します。</p>
+    </div>
+    <div class="card"><h3><span class="bar"></span>メンバー（${members.length}人）</h3>
+      ${members.map(m => { const p = pmap[m.user_id] || {}; return `
+        <div class="res-item">
+          <div class="avatar">${esc(initialOf(p.display_name))}</div>
+          <div style="min-width:0"><div class="res-name">${esc(p.display_name || '')}</div>
+          <div class="res-sub">${esc(p.email || '')}</div></div>
+          <div style="margin-left:auto;display:flex;gap:6px;align-items:center;flex-shrink:0">
+            ${roleSelect(m.role, `data-mrole="${m.id}"`)}
+            <button class="res-del" data-mdel="${m.id}" title="ルームから外す">✕</button>
+          </div>
+        </div>`; }).join('') || `<p class="muted">メンバーはいません</p>`}
+    </div>
+    ${invites.length ? `<div class="card"><h3><span class="bar"></span>招待中（未ログイン ${invites.length}人）</h3>
+      ${invites.map(i => `
+        <div class="res-item"><div class="res-icon">✉️</div>
+          <div style="min-width:0"><div class="res-name">${esc(i.email)}</div>
+          <div class="res-sub">${ROLE_LABELS[i.role] || esc(i.role)}として招待中</div></div>
+          <button class="res-del" data-idel="${i.id}" title="招待を取り消す" style="margin-left:auto">✕</button>
+        </div>`).join('')}
+    </div>` : ''}
+  `;
+  $('inv-add').onclick = async () => {
+    const email = $('inv-email').value.trim().toLowerCase();
+    const role = $('inv-role').value;
+    if (!email || !email.includes('@')) return toast('メールアドレスを入力してください');
+    const { data: found } = await supa.from('profiles').select('id').ilike('email', email).maybeSingle();
+    if (found) {
+      const { error } = await supa.from('memberships')
+        .upsert({ user_id: found.id, room_id: roomId, role }, { onConflict: 'user_id,room_id' });
+      if (error) return toast('追加に失敗しました：' + error.message);
+      toast('メンバーに追加しました');
+    } else {
+      const { error } = await supa.from('room_invitations').insert({ email, room_id: roomId, role });
+      if (error) return toast(String(error.code) === '23505' ? 'すでに招待済みです' : '招待に失敗しました：' + error.message);
+      toast('招待しました（初回ログイン時に自動参加します）');
+    }
+    renderMembers();
+  };
+  $('page').querySelectorAll('[data-mrole]').forEach(el => el.onchange = async () => {
+    const mem = members.find(x => x.id === el.dataset.mrole);
+    if (mem?.user_id === S.user.id && el.value !== 'admin'
+        && !confirm('自分自身を管理者から変更すると、この画面が使えなくなります。よろしいですか？')) {
+      el.value = mem.role; return;
+    }
+    const { error } = await supa.from('memberships').update({ role: el.value }).eq('id', el.dataset.mrole);
+    if (error) { toast('変更に失敗しました：' + error.message); el.value = mem?.role || 'member'; return; }
+    toast('ロールを変更しました');
+  });
+  $('page').querySelectorAll('[data-mdel]').forEach(el => el.onclick = async () => {
+    const mem = members.find(x => x.id === el.dataset.mdel);
+    const p = pmap[mem?.user_id] || {};
+    if (mem?.user_id === S.user.id) return toast('自分自身をルームから外すことはできません');
+    if (!confirm(`${p.display_name || p.email || 'このメンバー'}さんをルームから外しますか？`)) return;
+    const { error } = await supa.from('memberships').delete().eq('id', el.dataset.mdel);
+    if (error) return toast('削除に失敗しました：' + error.message);
+    toast('メンバーを外しました');
+    renderMembers();
+  });
+  $('page').querySelectorAll('[data-idel]').forEach(el => el.onclick = async () => {
+    if (!confirm('この招待を取り消しますか？')) return;
+    const { error } = await supa.from('room_invitations').delete().eq('id', el.dataset.idel);
+    if (error) return toast('取り消しに失敗しました：' + error.message);
+    toast('招待を取り消しました');
+    renderMembers();
+  });
+}
 
 /* ================= ホーム（新着フィード） ================= */
 async function openHome(){
