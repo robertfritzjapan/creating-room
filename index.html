@@ -432,7 +432,7 @@ function renderNav(){
     <div class="nav-item" data-nav="home"><span class="dot"></span>新着フィード</div>`;
   if (mine.length) {
     h += `<div class="nav-label">所属ルーム</div>` + mine.map(r =>
-      `<div class="nav-item" data-nav="${r.id}"><span class="dot"></span>${esc(r.name)}</div>`).join('');
+      `<div class="nav-item" data-nav="${r.id}">${r.slug === 'entrance' ? '' : '<span class="dot"></span>'}${esc(r.name)}</div>`).join('');
   }
   if (publicR.length) {
     h += `<div class="nav-label">参加できるルーム</div>` + publicR.map(r =>
