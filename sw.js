@@ -1,5 +1,5 @@
 /* Creating Room — Service Worker (stale-while-revalidate for app shell) */
-const CACHE = 'creating-room-v12';
+const CACHE = 'creating-room-v13';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './vendor/supabase.js', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => {

@@ -127,6 +127,10 @@ a{color:var(--ai)}
 .chat-input textarea:focus{border-color:var(--ai)}
 .send{background:var(--ai);color:#fff;border:none;border-radius:50%;width:38px;height:38px;cursor:pointer;font-size:15px;flex-shrink:0}
 .send:disabled{opacity:.4}
+.msg-del{background:none;border:none;color:var(--gray);font-size:11px;cursor:pointer;padding:0 0 0 8px;vertical-align:middle}
+.msg-del:hover{color:var(--ai)}
+.msg-text.msg-deleted{font-style:italic;color:var(--gray)}
+.msg.mine .msg-text.msg-deleted{background:var(--washi);color:var(--gray)}
 
 /* ===== Resources ===== */
 .res-item{display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid var(--line);text-decoration:none;color:inherit;position:relative}
@@ -456,6 +460,7 @@ async function start(){
 const isMember = roomId => S.memberships.some(m => m.room_id === roomId);
 const roleIn   = roomId => S.memberships.find(m => m.room_id === roomId)?.role || null;
 const canEdit  = roomId => ['admin', 'editor'].includes(roleIn(roomId));
+const isRoomAdmin = roomId => roleIn(roomId) === 'admin';
 
 /* ================= サイドバー ================= */
 function renderMe(){
@@ -771,11 +776,17 @@ async function ensureNames(userIds){
 function msgHtml(m){
   const name = S.profilesCache[m.user_id] || '…';
   const mine = m.user_id === S.user.id;
+  const deleted = !!m.deleted_at;
+  const canDelete = !deleted && (mine || isRoomAdmin(S.current.room.id));
+  const delBtn = canDelete ? `<button class="msg-del" data-mdel="${m.id}" title="削除">✕</button>` : '';
+  const textHtml = deleted
+    ? `<div class="msg-text msg-deleted">このメッセージは削除されました</div>`
+    : `<div class="msg-text">${esc(m.content)}</div>`;
   return `<div class="msg ${mine ? 'mine' : ''}" data-mid="${m.id}">
     <div class="avatar">${esc(initialOf(name))}</div>
     <div class="msg-body">
-      <div class="msg-head">${mine ? `<span>${fmtTime(m.created_at)}</span><b>${esc(name)}</b>` : `<b>${esc(name)}</b><span>${fmtTime(m.created_at)}</span>`}</div>
-      <div class="msg-text">${esc(m.content)}</div>
+      <div class="msg-head">${mine ? `<span>${fmtTime(m.created_at)}</span><b>${esc(name)}</b>` : `<b>${esc(name)}</b><span>${fmtTime(m.created_at)}</span>`}${delBtn}</div>
+      ${textHtml}
     </div>
   </div>`;
 }
@@ -816,7 +827,21 @@ async function renderChat(){
         await ensureNames([m.user_id]);
         appendMsg(m);
       })
+    .on('postgres_changes',
+      { event:'UPDATE', schema:'public', table:'messages', filter:'room_id=eq.' + roomId },
+      payload => applyMessageUpdate(payload.new))
     .subscribe();
+
+  // メッセージ削除（委任イベント。自分の発言 or ルームadminのみ、msgHtmlが表示条件を制御）
+  scroll.onclick = async e => {
+    const btn = e.target.closest('[data-mdel]');
+    if (!btn) return;
+    if (!confirm('このメッセージを削除しますか？（元に戻せません）')) return;
+    btn.disabled = true;
+    const { error } = await supa.rpc('soft_delete_message', { p_message_id: btn.dataset.mdel });
+    if (error) { btn.disabled = false; return toast('削除に失敗しました：' + error.message); }
+    applyMessageUpdate({ id: btn.dataset.mdel, deleted_at: new Date().toISOString() });
+  };
 
   // 送信
   const ta = $('chat-text'), btn = $('chat-send');
@@ -849,6 +874,13 @@ function appendMsg(m){
   }
   scroll.insertAdjacentHTML('beforeend', msgHtml(m));
   if (nearBottom || m.user_id === S.user.id) scroll.scrollTop = scroll.scrollHeight;
+}
+function applyMessageUpdate(m){
+  const el = document.querySelector(`[data-mid="${m.id}"]`);
+  if (!el || !m.deleted_at) return;
+  const textEl = el.querySelector('.msg-text');
+  if (textEl) { textEl.textContent = 'このメッセージは削除されました'; textEl.classList.add('msg-deleted'); }
+  el.querySelector('.msg-del')?.remove();
 }
 
 /* ===== リソース ===== */
