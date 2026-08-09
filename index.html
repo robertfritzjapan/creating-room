@@ -515,7 +515,19 @@ async function start(){
     console.error(e);
     toast('データの読み込みに失敗しました。ページを再読み込みしてください。');
   }
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').then(reg => reg.update()).catch(()=>{});
+    // 新しいService Workerに切り替わったら、1回だけ自動リロードして最新版を表示
+    // （初回インストール時や、ログイン直後のリダイレクト処理中はリロードしない）
+    const hadController = !!navigator.serviceWorker.controller;
+    const inAuthFlow = location.search.includes('code=') || location.hash.includes('access_token');
+    let swReloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || inAuthFlow || swReloaded) return;
+      swReloaded = true;
+      location.reload();
+    });
+  }
 }
 
 const isMember = roomId => S.memberships.some(m => m.room_id === roomId);
