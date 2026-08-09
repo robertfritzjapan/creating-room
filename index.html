@@ -146,6 +146,38 @@ a{color:var(--ai)}
 .res-name{font-weight:600;font-size:13.5px}
 .res-sub{font-size:11.5px;color:var(--gray)}
 
+/* ===== ツール ===== */
+.tool-card{border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
+.tool-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.tool-name{font-weight:600;font-size:14px}
+.tool-by{font-size:11px;color:var(--gray);margin-top:2px}
+.tool-actions{flex-shrink:0;white-space:nowrap}
+.tool-desc{font-size:12.5px;color:var(--ink);white-space:pre-wrap;margin-top:8px;line-height:1.8}
+.tool-link{display:inline-block;margin-top:10px;font-size:12.5px;color:var(--ai);text-decoration:none;border:1px solid var(--ai-soft);border-radius:16px;padding:5px 14px}
+.tool-link:hover{background:var(--ai-soft)}
+.tool-reviews{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.tool-reviews-title{font-size:11.5px;color:var(--gray);margin-bottom:8px}
+.tool-review{background:var(--washi);border-radius:8px;padding:9px 12px;margin-bottom:8px}
+.tool-review-head{font-size:11px;display:flex;align-items:center;gap:8px}
+.tool-review-head b{font-weight:600;font-size:12px}
+.tool-review-head span{color:var(--gray)}
+.tool-review-head .res-del{margin-left:auto;padding:0}
+.tool-review-body{font-size:12.5px;white-space:pre-wrap;margin-top:4px;line-height:1.7}
+.tool-review-empty{font-size:12px;color:var(--gray);margin-bottom:8px}
+.tool-review-form textarea{margin-bottom:0}
+
+/* ===== 事務局への質問 ===== */
+.q-wrap{max-width:640px}
+.q-new .sub{font-size:12px;color:var(--gray);margin:-4px 0 12px}
+.q-card-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.q-card-title{font-size:13.5px}
+.q-status{font-size:10.5px;padding:3px 10px;border-radius:12px;letter-spacing:.04em}
+.q-status-open{background:var(--ai-soft);color:var(--ai)}
+.q-status-resolved{background:var(--washi);color:var(--gray)}
+.q-card-head .res-del{margin-left:auto;border:1px solid var(--line);border-radius:14px;padding:4px 12px;font-size:11px}
+.q-thread{display:flex;flex-direction:column;gap:14px;margin-bottom:14px}
+.q-reply textarea{margin-bottom:0}
+
 /* ===== Feed ===== */
 .feed-item{display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--line)}
 .feed-item:last-child{border:none}
@@ -358,6 +390,26 @@ a{color:var(--ai)}
   </div>
 </div>
 
+<!-- ===== ツール追加・編集モーダル（編集者以上） ===== -->
+<div class="modal-bg" id="tool-modal">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:460px">
+    <h3 id="tool-modal-title">ツールを追加</h3>
+    <p class="sub" id="tool-modal-room"></p>
+    <label class="form-label">ツールの名前</label>
+    <input class="form-input" id="tool-name" placeholder="例：セッションレポート整形くん">
+    <label class="form-label">概要・使い方（任意）</label>
+    <textarea class="form-input" id="tool-desc" rows="5" placeholder="どんなツールか、どう使うかを書いてください"></textarea>
+    <label class="form-label">リンクURL（任意）</label>
+    <input class="form-input" id="tool-url" placeholder="https://…">
+    <div style="margin-top:10px">
+      <input type="file" id="tool-file" style="display:none">
+      <button class="add-res-btn" style="margin-bottom:0" id="tool-file-btn">📎 ファイルをアップロード</button>
+      <span class="muted" id="tool-file-status"></span>
+    </div>
+    <div style="margin-top:20px"><button class="primary-btn" id="tool-save">保存する</button></div>
+  </div>
+</div>
+
 <!-- ===== 名前設定モーダル ===== -->
 <div class="modal-bg" id="name-modal">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:380px">
@@ -388,6 +440,7 @@ const S = {
   videos: [], videoFilter: 'すべて', videoSearch: '',
   profilesCache: {},            // user_id -> display_name
   chatChannel: null,
+  toolsCache: [], editingTool: null, toolFileUrl: null, toolFileName: null,
 };
 
 const $ = id => document.getElementById(id);
@@ -542,7 +595,7 @@ function openRoom(room){
   S.current = { type:'room', room };
   $('room-title').textContent = room.name;
   updatePinBtn();
-  const tabs = [['pinned','固定情報'],['archive','アーカイブ'],['chat','チャット'],['resources','リソース']];
+  const tabs = [['pinned','固定情報'],['archive','アーカイブ'],['chat','質問'],['resources','リソース']];
   if (roleIn(room.id) === 'admin') tabs.push(['members','メンバー']);
   $('tabs').innerHTML = tabs.map(([k,label]) =>
     `<div class="tab" data-tab="${k}">${label}</div>`).join('');
@@ -766,148 +819,237 @@ function drawArchive(){
   if (q || S.videoSearch) { sb.focus(); sb.setSelectionRange(sb.value.length, sb.value.length); }
 }
 
-/* ===== チャット ===== */
+/* ===== 事務局への質問（本人＋ルームadminのみ閲覧可） ===== */
 async function ensureNames(userIds){
   const missing = [...new Set(userIds)].filter(id => !(id in S.profilesCache));
   if (!missing.length) return;
   const { data } = await supa.from('profiles').select('id, display_name').in('id', missing);
   (data || []).forEach(p => S.profilesCache[p.id] = p.display_name);
 }
-function msgHtml(m){
-  const name = S.profilesCache[m.user_id] || '…';
-  const mine = m.user_id === S.user.id;
-  const deleted = !!m.deleted_at;
-  const canDelete = !deleted && (mine || isRoomAdmin(S.current.room.id));
-  const delBtn = canDelete ? `<button class="msg-del" data-mdel="${m.id}" title="削除">✕</button>` : '';
-  const textHtml = deleted
-    ? `<div class="msg-text msg-deleted">このメッセージは削除されました</div>`
-    : `<div class="msg-text">${esc(m.content)}</div>`;
-  return `<div class="msg ${mine ? 'mine' : ''}" data-mid="${m.id}">
-    <div class="avatar">${esc(initialOf(name))}</div>
-    <div class="msg-body">
-      <div class="msg-head">${mine ? `<span>${fmtTime(m.created_at)}</span><b>${esc(name)}</b>` : `<b>${esc(name)}</b><span>${fmtTime(m.created_at)}</span>`}${delBtn}</div>
-      ${textHtml}
+function inquiryCardHtml(i, msgs, isAdmin){
+  const askerName = S.profilesCache[i.user_id] || '…';
+  const resolved = i.status === 'resolved';
+  const threadHtml = msgs.map(m => {
+    const name = S.profilesCache[m.sender_id] || '…';
+    const mine = m.sender_id === S.user.id;
+    return `<div class="msg ${mine ? 'mine' : ''}">
+      <div class="avatar">${esc(initialOf(name))}</div>
+      <div class="msg-body">
+        <div class="msg-head">${mine ? `<span>${fmtTime(m.created_at)}</span><b>${esc(name)}</b>` : `<b>${esc(name)}</b><span>${fmtTime(m.created_at)}</span>`}</div>
+        <div class="msg-text">${esc(m.body)}</div>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="card q-card">
+    <div class="q-card-head">
+      <div class="q-card-title">${isAdmin ? `<b>${esc(askerName)}</b>さんからの質問` : `あなたの質問`}</div>
+      <span class="q-status ${resolved ? 'q-status-resolved' : 'q-status-open'}">${resolved ? '解決済み' : '対応中'}</span>
+      ${isAdmin ? `<button class="res-del" data-resolve="${i.id}" data-status="${i.status}">${resolved ? '対応中に戻す' : '解決済みにする'}</button>` : ''}
+    </div>
+    <div class="q-thread">${threadHtml}</div>
+    <div class="q-reply">
+      <textarea class="form-input" rows="2" data-reply-input="${i.id}" placeholder="返信する"></textarea>
+      <button class="add-res-btn" style="margin-top:8px" data-reply-send="${i.id}">返信を送る</button>
     </div>
   </div>`;
 }
 async function renderChat(){
-  $('page').innerHTML = `
-    <div class="chat-wrap">
-      <div class="chat-scroll" id="chat-scroll"><div class="empty">読み込み中…</div></div>
-      <div class="chat-input">
-        <textarea id="chat-text" rows="1" placeholder="${esc(S.current.room.name)}のみんなにメッセージ…"></textarea>
-        <button class="send" id="chat-send">↑</button>
-      </div>
-    </div>`;
-  const roomId = S.current.room.id;
-  const { data, error } = await supa.from('messages').select('*')
-    .eq('room_id', roomId).order('created_at', { ascending:false }).limit(100);
-  const scroll = $('chat-scroll');
-  if (error) { scroll.innerHTML = `<div class="empty">読み込みに失敗しました</div>`; return; }
-  const msgs = (data || []).reverse();
-  await ensureNames(msgs.map(m => m.user_id));
-  let h = '', lastDay = '';
-  for (const m of msgs) {
-    const day = fmtDay(m.created_at);
-    if (day !== lastDay) { h += `<div class="day-divider"><span>${day}</span></div>`; lastDay = day; }
-    h += msgHtml(m);
-  }
-  scroll.innerHTML = h || `<div class="empty">最初のメッセージを送ってみましょう</div>`;
-  scroll.scrollTop = scroll.scrollHeight;
-  scroll.dataset.lastDay = lastDay;
-
-  // リアルタイム購読
   leaveChat();
-  S.chatChannel = supa.channel('room-' + roomId)
-    .on('postgres_changes',
-      { event:'INSERT', schema:'public', table:'messages', filter:'room_id=eq.' + roomId },
-      async payload => {
-        const m = payload.new;
-        if ($('chat-scroll')?.querySelector(`[data-mid="${m.id}"]`)) return;
-        await ensureNames([m.user_id]);
-        appendMsg(m);
-      })
-    .on('postgres_changes',
-      { event:'UPDATE', schema:'public', table:'messages', filter:'room_id=eq.' + roomId },
-      payload => applyMessageUpdate(payload.new))
-    .subscribe();
+  $('page').innerHTML = `<div class="empty">読み込み中…</div>`;
+  const roomId = S.current.room.id;
+  const isAdmin = isRoomAdmin(roomId);
 
-  // メッセージ削除（委任イベント。自分の発言 or ルームadminのみ、msgHtmlが表示条件を制御）
-  scroll.onclick = async e => {
-    const btn = e.target.closest('[data-mdel]');
-    if (!btn) return;
-    if (!confirm('このメッセージを削除しますか？（元に戻せません）')) return;
-    btn.disabled = true;
-    const { error } = await supa.rpc('soft_delete_message', { p_message_id: btn.dataset.mdel });
-    if (error) { btn.disabled = false; return toast('削除に失敗しました：' + error.message); }
-    applyMessageUpdate({ id: btn.dataset.mdel, deleted_at: new Date().toISOString() });
-  };
+  let q = supa.from('inquiries').select('*').eq('room_id', roomId);
+  if (!isAdmin) q = q.eq('user_id', S.user.id);
+  const { data: inquiries, error } = await q;
+  if (error) { $('page').innerHTML = `<div class="empty">読み込みに失敗しました</div>`; return; }
 
-  // 送信
-  const ta = $('chat-text'), btn = $('chat-send');
-  const doSend = async () => {
-    const text = ta.value.trim();
-    if (!text) return;
-    btn.disabled = true; ta.value = '';
-    const { data: ins, error: e2 } = await supa.from('messages')
-      .insert({ room_id: roomId, user_id: S.user.id, content: text }).select().single();
-    btn.disabled = false;
-    if (e2) { ta.value = text; return toast('送信に失敗しました：' + e2.message); }
-    if (!$('chat-scroll').querySelector(`[data-mid="${ins.id}"]`)) appendMsg(ins);
-    ta.focus();
-  };
-  btn.onclick = doSend;
-  // Enterで送信（Shift+Enterで改行）。日本語入力の変換確定Enterでは送信されない
-  ta.onkeydown = e => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); doSend(); }
-  };
-}
-function appendMsg(m){
-  const scroll = $('chat-scroll');
-  if (!scroll) return;
-  scroll.querySelector('.empty')?.remove();
-  const day = fmtDay(m.created_at);
-  const nearBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 120;
-  if (scroll.dataset.lastDay !== day) {
-    scroll.insertAdjacentHTML('beforeend', `<div class="day-divider"><span>${day}</span></div>`);
-    scroll.dataset.lastDay = day;
+  const ids = (inquiries || []).map(i => i.id);
+  let msgs = [];
+  if (ids.length) {
+    const { data } = await supa.from('inquiry_messages').select('*')
+      .in('inquiry_id', ids).order('created_at', { ascending:true });
+    msgs = data || [];
   }
-  scroll.insertAdjacentHTML('beforeend', msgHtml(m));
-  if (nearBottom || m.user_id === S.user.id) scroll.scrollTop = scroll.scrollHeight;
-}
-function applyMessageUpdate(m){
-  const el = document.querySelector(`[data-mid="${m.id}"]`);
-  if (!el || !m.deleted_at) return;
-  const textEl = el.querySelector('.msg-text');
-  if (textEl) { textEl.textContent = 'このメッセージは削除されました'; textEl.classList.add('msg-deleted'); }
-  el.querySelector('.msg-del')?.remove();
+  await ensureNames([...(inquiries || []).map(i => i.user_id), ...msgs.map(m => m.sender_id)]);
+  const msgsByInquiry = {};
+  msgs.forEach(m => (msgsByInquiry[m.inquiry_id] = msgsByInquiry[m.inquiry_id] || []).push(m));
+
+  const sorted = [...(inquiries || [])].sort((a, b) => {
+    const la = msgsByInquiry[a.id]?.at(-1)?.created_at || a.created_at;
+    const lb = msgsByInquiry[b.id]?.at(-1)?.created_at || b.created_at;
+    return new Date(lb) - new Date(la);
+  });
+
+  const newFormHtml = !isAdmin ? `
+    <div class="card q-new">
+      <h3><span class="bar"></span>事務局に質問する</h3>
+      <p class="sub">ここで送った質問は、あなたと事務局だけが見られます。</p>
+      <textarea class="form-input" id="q-new-body" rows="3" placeholder="聞きたいことを書いてください"></textarea>
+      <button class="primary-btn" style="margin-top:10px" id="q-new-send">質問を送る</button>
+    </div>` : '';
+
+  const listHtml = sorted.length
+    ? sorted.map(i => inquiryCardHtml(i, msgsByInquiry[i.id] || [], isAdmin)).join('')
+    : `<div class="empty">${isAdmin ? 'まだ質問は届いていません' : 'まだ質問したことはありません'}</div>`;
+
+  $('page').innerHTML = `<div class="q-wrap">${newFormHtml}${listHtml}</div>`;
+
+  const nb = $('q-new-send');
+  if (nb) nb.onclick = async () => {
+    const body = $('q-new-body').value.trim();
+    if (!body) return;
+    nb.disabled = true;
+    const { data: inq, error: e1 } = await supa.from('inquiries')
+      .insert({ room_id: roomId, user_id: S.user.id }).select().single();
+    if (e1) { nb.disabled = false; return toast('送信に失敗しました：' + e1.message); }
+    const { error: e2 } = await supa.from('inquiry_messages')
+      .insert({ inquiry_id: inq.id, sender_id: S.user.id, body });
+    nb.disabled = false;
+    if (e2) return toast('送信に失敗しました：' + e2.message);
+    toast('質問を送りました');
+    renderChat();
+  };
+
+  $('page').querySelectorAll('[data-reply-send]').forEach(el => el.onclick = async () => {
+    const inqId = el.dataset.replySend;
+    const ta = $('page').querySelector(`[data-reply-input="${inqId}"]`);
+    const body = ta.value.trim();
+    if (!body) return;
+    el.disabled = true;
+    const { error: e2 } = await supa.from('inquiry_messages')
+      .insert({ inquiry_id: inqId, sender_id: S.user.id, body });
+    el.disabled = false;
+    if (e2) return toast('送信に失敗しました：' + e2.message);
+    renderChat();
+  });
+
+  $('page').querySelectorAll('[data-resolve]').forEach(el => el.onclick = async () => {
+    const inqId = el.dataset.resolve;
+    const newStatus = el.dataset.status === 'open' ? 'resolved' : 'open';
+    const { error: e2 } = await supa.from('inquiries').update({ status: newStatus }).eq('id', inqId);
+    if (e2) return toast('更新に失敗しました：' + e2.message);
+    renderChat();
+  });
 }
 
 /* ===== リソース ===== */
+function toolCardHtml(t, reviewsByTool, isEditor){
+  const revs = reviewsByTool[t.id] || [];
+  const authorName = S.profilesCache[t.created_by] || '…';
+  const linkHtml = t.file_url
+    ? `<a class="tool-link" href="${esc(t.file_url)}" target="_blank" rel="noopener">📎 ${esc(t.file_name || 'ファイルを開く')}</a>`
+    : (t.url ? `<a class="tool-link" href="${esc(t.url)}" target="_blank" rel="noopener">🔗 リンクを開く</a>` : '');
+  return `<div class="tool-card" data-tool="${t.id}">
+    <div class="tool-head">
+      <div>
+        <div class="tool-name">${esc(t.name)}</div>
+        <div class="tool-by">${esc(authorName)}が追加</div>
+      </div>
+      ${isEditor ? `<span class="tool-actions"><button class="res-del" data-tedit="${t.id}" title="編集">✏️</button><button class="res-del" data-tdel="${t.id}" title="削除">✕</button></span>` : ''}
+    </div>
+    ${t.description ? `<div class="tool-desc">${esc(t.description)}</div>` : ''}
+    ${linkHtml}
+    <div class="tool-reviews">
+      <div class="tool-reviews-title">使い手の声（${revs.length}）</div>
+      ${revs.map(r => reviewHtml(r)).join('') || `<div class="tool-review-empty">まだレビューはありません</div>`}
+      <div class="tool-review-form">
+        <textarea class="form-input" rows="2" data-review-input="${t.id}" placeholder="使ってみてどうでしたか？良かった点や、もっとこうだったら…など"></textarea>
+        <button class="add-res-btn" style="margin:8px 0 0" data-review-send="${t.id}">レビューを投稿</button>
+      </div>
+    </div>
+  </div>`;
+}
+function reviewHtml(r){
+  const name = S.profilesCache[r.user_id] || '…';
+  const mine = r.user_id === S.user.id;
+  const canDel = mine || isRoomAdmin(S.current.room.id);
+  return `<div class="tool-review" data-review="${r.id}">
+    <div class="tool-review-head"><b>${esc(name)}</b><span>${fmtTime(r.created_at)}</span>${canDel ? `<button class="res-del" data-rdel="${r.id}" title="削除">✕</button>` : ''}</div>
+    <div class="tool-review-body">${esc(r.body)}</div>
+  </div>`;
+}
 async function renderResources(){
   $('page').innerHTML = `<div class="empty">読み込み中…</div>`;
-  const { data, error } = await supa.from('resources').select('*')
-    .eq('room_id', S.current.room.id).order('sort_order');
-  if (error) { $('page').innerHTML = `<div class="empty">読み込みに失敗しました</div>`; return; }
-  const isAdmin = canEdit(S.current.room.id);
-  S.resCats = [...new Set((data || []).map(r => r.category))];
-  const addBtn = isAdmin ? `<button class="add-res-btn" id="add-res">＋ リソースを追加</button>` : '';
-  if (!data?.length) {
-    $('page').innerHTML = addBtn + `<div class="empty">リソースはまだありません</div>`;
+  const roomId = S.current.room.id;
+  const [{ data: resData, error: resErr }, { data: toolData, error: toolErr }] = await Promise.all([
+    supa.from('resources').select('*').eq('room_id', roomId).order('sort_order'),
+    supa.from('tools').select('*').eq('room_id', roomId).order('created_at', { ascending:false })
+  ]);
+  if (resErr || toolErr) { $('page').innerHTML = `<div class="empty">読み込みに失敗しました</div>`; return; }
+  let reviews = [];
+  if (toolData?.length) {
+    const { data: revData } = await supa.from('tool_reviews').select('*')
+      .in('tool_id', toolData.map(t => t.id)).order('created_at', { ascending:true });
+    reviews = revData || [];
+  }
+  await ensureNames([...toolData.map(t => t.created_by), ...reviews.map(r => r.user_id)].filter(Boolean));
+  const reviewsByTool = {};
+  reviews.forEach(r => (reviewsByTool[r.tool_id] = reviewsByTool[r.tool_id] || []).push(r));
+
+  const isEditor = canEdit(roomId);
+  S.toolsCache = toolData || [];
+  const toolAddBtn = isEditor ? `<button class="add-res-btn" id="add-tool">＋ ツールを追加</button>` : '';
+  const toolSection = `<div class="card tool-section"><h3><span class="bar"></span>🛠 ツール</h3>
+    ${toolAddBtn}
+    ${S.toolsCache.length ? S.toolsCache.map(t => toolCardHtml(t, reviewsByTool, isEditor)).join('') : `<div class="empty">まだツールはありません</div>`}
+  </div>`;
+
+  S.resCats = [...new Set((resData || []).map(r => r.category))];
+  const addBtn = isEditor ? `<button class="add-res-btn" id="add-res">＋ リソースを追加</button>` : '';
+  let resSection;
+  if (!resData?.length) {
+    resSection = addBtn + `<div class="empty">リソースはまだありません</div>`;
   } else {
     const groups = {};
-    data.forEach(r => (groups[r.category] = groups[r.category] || []).push(r));
-    $('page').innerHTML = addBtn + Object.entries(groups).map(([cat, items]) => `
+    resData.forEach(r => (groups[r.category] = groups[r.category] || []).push(r));
+    resSection = addBtn + Object.entries(groups).map(([cat, items]) => `
       <div class="card"><h3><span class="bar"></span>${esc(cat)}</h3>
         ${items.map(r => `
           <a class="res-item" ${r.url ? `href="${esc(r.url)}" target="_blank" rel="noopener"` : ''}>
             <div class="res-icon">${esc(r.icon || '📄')}</div>
             <div><div class="res-name">${esc(r.title)}</div>
             ${r.subtitle ? `<div class="res-sub">${esc(r.subtitle)}</div>` : ''}</div>
-            ${isAdmin ? `<button class="res-del" data-del="${r.id}" title="削除">✕</button>` : ''}
+            ${isEditor ? `<button class="res-del" data-del="${r.id}" title="削除">✕</button>` : ''}
           </a>`).join('')}
       </div>`).join('');
   }
+
+  $('page').innerHTML = toolSection + resSection;
+
+  const atb = $('add-tool');
+  if (atb) atb.onclick = () => openToolModal(null);
+  $('page').querySelectorAll('[data-tedit]').forEach(el => el.onclick = () => {
+    openToolModal(S.toolsCache.find(t => t.id === el.dataset.tedit) || null);
+  });
+  $('page').querySelectorAll('[data-tdel]').forEach(el => el.onclick = async () => {
+    if (!confirm('このツールを削除しますか？レビューも一緒に削除されます。')) return;
+    const { error } = await supa.from('tools').delete().eq('id', el.dataset.tdel);
+    if (error) return toast('削除に失敗しました：' + error.message);
+    toast('削除しました');
+    renderResources();
+  });
+  $('page').querySelectorAll('[data-rdel]').forEach(el => el.onclick = async () => {
+    if (!confirm('このレビューを削除しますか？')) return;
+    const { error } = await supa.from('tool_reviews').delete().eq('id', el.dataset.rdel);
+    if (error) return toast('削除に失敗しました：' + error.message);
+    toast('削除しました');
+    renderResources();
+  });
+  $('page').querySelectorAll('[data-review-send]').forEach(el => el.onclick = async () => {
+    const toolId = el.dataset.reviewSend;
+    const ta = $('page').querySelector(`[data-review-input="${toolId}"]`);
+    const body = ta.value.trim();
+    if (!body) return;
+    el.disabled = true;
+    const { error } = await supa.from('tool_reviews').insert({ tool_id: toolId, user_id: S.user.id, body });
+    el.disabled = false;
+    if (error) return toast('投稿に失敗しました：' + error.message);
+    ta.value = '';
+    toast('レビューを投稿しました');
+    renderResources();
+  });
+
   const ab = $('add-res');
   if (ab) ab.onclick = openResModal;
   $('page').querySelectorAll('[data-del]').forEach(el => el.onclick = async e => {
@@ -919,6 +1061,52 @@ async function renderResources(){
     renderResources();
   });
 }
+function openToolModal(t){
+  S.editingTool = t || null;
+  S.toolFileUrl = t?.file_url || null;
+  S.toolFileName = t?.file_name || null;
+  $('tool-modal-title').textContent = t ? 'ツールを編集' : 'ツールを追加';
+  $('tool-modal-room').textContent = S.current.room.name + ' のツールに追加されます';
+  $('tool-name').value = t?.name || '';
+  $('tool-desc').value = t?.description || '';
+  $('tool-url').value = t?.url || '';
+  $('tool-file').value = '';
+  $('tool-file-status').textContent = t?.file_name ? `現在のファイル：${t.file_name}` : '';
+  $('tool-modal').style.display = 'flex';
+}
+$('tool-modal').onclick = () => $('tool-modal').style.display = 'none';
+$('tool-file-btn').onclick = () => $('tool-file').click();
+$('tool-file').onchange = async () => {
+  const file = $('tool-file').files[0];
+  if (!file) return;
+  $('tool-file-status').textContent = 'アップロード中…';
+  const path = `${S.current.room.slug}/tools/${Date.now()}-${file.name.replace(/[^\w.\-]+/g, '_')}`;
+  const { error } = await supa.storage.from('room-media').upload(path, file);
+  if (error) { $('tool-file-status').textContent = ''; return toast('アップロードに失敗しました：' + error.message); }
+  const { data } = supa.storage.from('room-media').getPublicUrl(path);
+  S.toolFileUrl = data.publicUrl;
+  S.toolFileName = file.name;
+  $('tool-file-status').textContent = `✓ ${file.name}`;
+};
+$('tool-save').onclick = async () => {
+  const name = $('tool-name').value.trim();
+  if (!name) return toast('名前は必須です');
+  const row = {
+    name,
+    description: $('tool-desc').value.trim() || null,
+    url: $('tool-url').value.trim() || null,
+    file_url: S.toolFileUrl || null,
+    file_name: S.toolFileName || null,
+  };
+  const q = S.editingTool
+    ? supa.from('tools').update(row).eq('id', S.editingTool.id)
+    : supa.from('tools').insert({ ...row, room_id: S.current.room.id, created_by: S.user.id });
+  const { error } = await q;
+  if (error) return toast('保存に失敗しました：' + error.message);
+  $('tool-modal').style.display = 'none';
+  toast(S.editingTool ? 'ツールを更新しました' : 'ツールを追加しました');
+  renderResources();
+};
 /* ===== 動画の追加・編集（管理者・編集者） ===== */
 function openVidModal(v){
   S.editingVideo = v || null;
