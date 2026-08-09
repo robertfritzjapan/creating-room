@@ -862,7 +862,7 @@ async function renderChat(){
   let q = supa.from('inquiries').select('*').eq('room_id', roomId);
   if (!isAdmin) q = q.eq('user_id', S.user.id);
   const { data: inquiries, error } = await q;
-  if (error) { $('page').innerHTML = `<div class="empty">読み込みに失敗しました</div>`; return; }
+  if (error) { $('page').innerHTML = `<div class="empty">読み込みに失敗しました<br><span style="font-size:11px;color:#999">${esc(error.code || '')} ${esc(error.message || '')}</span></div>`; return; }
 
   const ids = (inquiries || []).map(i => i.id);
   let msgs = [];
