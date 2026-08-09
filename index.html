@@ -761,7 +761,7 @@ async function renderArchive(){
   $('page').innerHTML = `<div class="empty">読み込み中…</div>`;
   const { data, error } = await supa.from('videos').select('*')
     .eq('room_id', S.current.room.id).order('session_date', { ascending:false });
-  if (error) { $('page').innerHTML = `<div class="empty">読み込みに失敗しました</div>`; return; }
+  if (error) { $('page').innerHTML = `<div class="empty">読み込みに失敗しました<br><span style="font-size:11px;color:#999">${esc(error.code || '')} ${esc(error.message || '')}</span></div>`; return; }
   S.videos = data || [];
   S.videoFilter = 'すべて'; S.videoSearch = '';
   drawArchive();
@@ -976,7 +976,7 @@ async function renderResources(){
     supa.from('resources').select('*').eq('room_id', roomId).order('sort_order'),
     supa.from('tools').select('*').eq('room_id', roomId).order('created_at', { ascending:false })
   ]);
-  if (resErr || toolErr) { $('page').innerHTML = `<div class="empty">読み込みに失敗しました</div>`; return; }
+  if (resErr || toolErr) { const _e = resErr || toolErr; $('page').innerHTML = `<div class="empty">読み込みに失敗しました<br><span style="font-size:11px;color:#999">${esc(resErr ? 'resources' : 'tools')}: ${esc(_e.code || '')} ${esc(_e.message || '')}</span></div>`; return; }
   let reviews = [];
   if (toolData?.length) {
     const { data: revData } = await supa.from('tool_reviews').select('*')
@@ -1180,7 +1180,7 @@ async function renderMembers(){
     supa.from('memberships').select('*').eq('room_id', roomId),
     supa.from('room_invitations').select('*').eq('room_id', roomId).is('claimed_at', null),
   ]);
-  if (mRes.error) { $('page').innerHTML = `<div class="empty">読み込みに失敗しました</div>`; return; }
+  if (mRes.error) { $('page').innerHTML = `<div class="empty">読み込みに失敗しました<br><span style="font-size:11px;color:#999">${esc(mRes.error.code || '')} ${esc(mRes.error.message || '')}</span></div>`; return; }
   const members = mRes.data || [];
   const { data: profs } = members.length
     ? await supa.from('profiles').select('id, email, display_name').in('id', members.map(m => m.user_id))
