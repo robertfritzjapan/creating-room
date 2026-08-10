@@ -180,6 +180,7 @@ a{color:var(--ai)}
 .tool-by{font-size:11px;color:var(--gray);margin-top:2px}
 .tool-actions{flex-shrink:0;white-space:nowrap}
 .tool-desc{font-size:12.5px;color:var(--ink);white-space:pre-wrap;margin-top:8px;line-height:1.8}
+.tool-links{display:flex;flex-wrap:wrap;gap:8px}
 .tool-link{display:inline-block;margin-top:10px;font-size:12.5px;color:var(--ai);text-decoration:none;border:1px solid var(--ai-soft);border-radius:16px;padding:5px 14px}
 .tool-link:hover{background:var(--ai-soft)}
 .tool-reviews{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
@@ -461,9 +462,11 @@ a{color:var(--ai)}
     <textarea class="form-input" id="tool-desc" rows="5" placeholder="どんなツールか、どう使うかを書いてください"></textarea>
     <label class="form-label">リンクURL（任意）</label>
     <input class="form-input" id="tool-url" placeholder="https://…">
-    <div style="margin-top:10px">
-      <input type="file" id="tool-file" style="display:none">
-      <button class="add-res-btn" style="margin-bottom:0" id="tool-file-btn">📎 ファイルをアップロード</button>
+    <label class="form-label">添付ファイル（任意・複数可）</label>
+    <div id="tool-att-list" style="font-size:12.5px"></div>
+    <div style="margin-top:6px">
+      <input type="file" id="tool-file" style="display:none" multiple>
+      <button class="add-res-btn" style="margin-bottom:0" id="tool-file-btn">📎 ファイルを追加</button>
       <span class="muted" id="tool-file-status"></span>
     </div>
     <label class="form-label">共有テキスト（プロンプトなど・任意）</label>
@@ -682,6 +685,22 @@ function showTab(tab){
   S.tab = tab;
   $('tabs').querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
   ({pinned:renderPinned, archive:renderArchive, chat:renderChat, resources:renderResources, members:renderMembers})[tab]();
+}
+
+/* ===== ファイルアップロード共通（テキスト系は文字コードを明示して文字化けを防ぐ） ===== */
+async function uploadRoomFile(file, subdir){
+  const extM = file.name.match(/\.([a-z0-9]+)$/i);
+  const ext = extM ? extM[1].toLowerCase() : '';
+  const textTypes = { html:'text/html', htm:'text/html', md:'text/plain', markdown:'text/plain',
+                      txt:'text/plain', csv:'text/csv', json:'application/json', svg:'image/svg+xml' };
+  const opts = {};
+  if (textTypes[ext]) opts.contentType = textTypes[ext] + '; charset=utf-8';
+  else if (file.type) opts.contentType = file.type;
+  const path = `${S.current.room.slug}/${subdir}/${Date.now()}-${file.name.replace(/[^\w.\-]+/g, '_')}`;
+  const { error } = await supa.storage.from('room-media').upload(path, file, opts);
+  if (error) throw error;
+  const { data } = supa.storage.from('room-media').getPublicUrl(path);
+  return { name: file.name, url: data.publicUrl };
 }
 
 /* ===== 固定情報 ===== */
@@ -1083,9 +1102,12 @@ async function renderChat(){
 function toolCardHtml(t, reviewsByTool, isEditor){
   const revs = reviewsByTool[t.id] || [];
   const authorName = S.profilesCache[t.created_by] || '…';
-  const linkHtml = t.file_url
-    ? `<a class="tool-link" href="${esc(t.file_url)}" target="_blank" rel="noopener">📎 ${esc(t.file_name || 'ファイルを開く')}</a>`
-    : (t.url ? `<a class="tool-link" href="${esc(t.url)}" target="_blank" rel="noopener">🔗 リンクを開く</a>` : '');
+  const atts = (t.attachments && t.attachments.length) ? t.attachments
+    : (t.file_url ? [{ name: t.file_name || 'ファイルを開く', url: t.file_url }] : []);
+  const linkHtml = `<div class="tool-links">${[
+    ...atts.map(a => `<a class="tool-link" href="${esc(a.url)}" target="_blank" rel="noopener">📎 ${esc(a.name)}</a>`),
+    t.url ? `<a class="tool-link" href="${esc(t.url)}" target="_blank" rel="noopener">🔗 リンクを開く</a>` : ''
+  ].filter(Boolean).join('')}</div>`;
   return `<div class="tool-card" data-tool="${t.id}">
     <div class="tool-head">
       <div>
@@ -1235,8 +1257,11 @@ $('sg-save').onclick = async () => {
 
 function openToolModal(t){
   S.editingTool = t || null;
-  S.toolFileUrl = t?.file_url || null;
-  S.toolFileName = t?.file_name || null;
+  S.toolAtts = structuredClone(
+    (t?.attachments && t.attachments.length) ? t.attachments
+    : (t?.file_url ? [{ name: t.file_name || 'ファイル', url: t.file_url }] : [])
+  );
+  drawToolAtts();
   $('tool-modal-title').textContent = t ? 'ツールを編集' : 'ツールを追加';
   $('tool-modal-room').textContent = S.current.room.name + ' のツールに追加されます';
   $('tool-name').value = t?.name || '';
@@ -1244,22 +1269,35 @@ function openToolModal(t){
   $('tool-content').value = t?.content || '';
   $('tool-url').value = t?.url || '';
   $('tool-file').value = '';
-  $('tool-file-status').textContent = t?.file_name ? `現在のファイル：${t.file_name}` : '';
+  $('tool-file-status').textContent = '';
   $('tool-modal').style.display = 'flex';
+}
+function drawToolAtts(){
+  $('tool-att-list').innerHTML = (S.toolAtts || []).map((a, i) =>
+    `<div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📎 ${esc(a.name)}</span>
+      <button class="res-del" data-tadel="${i}" title="削除">✕</button>
+    </div>`).join('');
+  $('tool-att-list').querySelectorAll('[data-tadel]').forEach(el => el.onclick = () => {
+    S.toolAtts.splice(Number(el.dataset.tadel), 1);
+    drawToolAtts();
+  });
 }
 $('tool-modal').onclick = () => $('tool-modal').style.display = 'none';
 $('tool-file-btn').onclick = () => $('tool-file').click();
 $('tool-file').onchange = async () => {
-  const file = $('tool-file').files[0];
-  if (!file) return;
+  const files = [...$('tool-file').files];
+  if (!files.length) return;
   $('tool-file-status').textContent = 'アップロード中…';
-  const path = `${S.current.room.slug}/tools/${Date.now()}-${file.name.replace(/[^\w.\-]+/g, '_')}`;
-  const { error } = await supa.storage.from('room-media').upload(path, file);
-  if (error) { $('tool-file-status').textContent = ''; return toast('アップロードに失敗しました：' + error.message); }
-  const { data } = supa.storage.from('room-media').getPublicUrl(path);
-  S.toolFileUrl = data.publicUrl;
-  S.toolFileName = file.name;
-  $('tool-file-status').textContent = `✓ ${file.name}`;
+  try {
+    for (const file of files) S.toolAtts.push(await uploadRoomFile(file, 'tools'));
+  } catch (err) {
+    $('tool-file-status').textContent = '';
+    return toast('アップロードに失敗しました：' + err.message);
+  }
+  $('tool-file-status').textContent = '';
+  $('tool-file').value = '';
+  drawToolAtts();
 };
 $('tool-save').onclick = async () => {
   const name = $('tool-name').value.trim();
@@ -1269,8 +1307,9 @@ $('tool-save').onclick = async () => {
     description: $('tool-desc').value.trim() || null,
     content: $('tool-content').value.trim() ? $('tool-content').value : null,
     url: $('tool-url').value.trim() || null,
-    file_url: S.toolFileUrl || null,
-    file_name: S.toolFileName || null,
+    attachments: S.toolAtts || [],
+    file_url: null,
+    file_name: null,
   };
   const q = S.editingTool
     ? supa.from('tools').update(row).eq('id', S.editingTool.id)
@@ -1315,13 +1354,11 @@ $('vid-att-file').onchange = async () => {
   const files = [...$('vid-att-file').files];
   if (!files.length) return;
   $('vid-att-status').textContent = 'アップロード中…';
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    const path = `${S.current.room.slug}/materials/${Date.now()}-${i}-${file.name.replace(/[^\w.\-]+/g, '_')}`;
-    const { error } = await supa.storage.from('room-media').upload(path, file);
-    if (error) { $('vid-att-status').textContent = ''; return toast('アップロードに失敗しました：' + error.message); }
-    const { data } = supa.storage.from('room-media').getPublicUrl(path);
-    S.vidAtts.push({ name: file.name, url: data.publicUrl });
+  try {
+    for (const file of files) S.vidAtts.push(await uploadRoomFile(file, 'materials'));
+  } catch (err) {
+    $('vid-att-status').textContent = '';
+    return toast('アップロードに失敗しました：' + err.message);
   }
   $('vid-att-status').textContent = '';
   $('vid-att-file').value = '';
@@ -1364,13 +1401,15 @@ $('res-file').onchange = async () => {
   const file = $('res-file').files[0];
   if (!file) return;
   $('res-file-status').textContent = 'アップロード中…';
-  const path = `${S.current.room.slug}/resources/${Date.now()}-${file.name.replace(/[^\w.\-]+/g, '_')}`;
-  const { error } = await supa.storage.from('room-media').upload(path, file);
-  if (error) { $('res-file-status').textContent = ''; return toast('アップロードに失敗しました：' + error.message); }
-  const { data } = supa.storage.from('room-media').getPublicUrl(path);
-  S.resFileUrl = data.publicUrl;
-  S.resFileName = file.name;
-  $('res-file-status').textContent = `✓ ${file.name}`;
+  try {
+    const up = await uploadRoomFile(file, 'resources');
+    S.resFileUrl = up.url;
+    S.resFileName = up.name;
+    $('res-file-status').textContent = `✓ ${up.name}`;
+  } catch (err) {
+    $('res-file-status').textContent = '';
+    return toast('アップロードに失敗しました：' + err.message);
+  }
   $('res-file').value = '';
 };
 $('res-save').onclick = async () => {
