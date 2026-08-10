@@ -147,6 +147,15 @@ a{color:var(--ai)}
 .res-sub{font-size:11.5px;color:var(--gray)}
 
 /* ===== ツール ===== */
+.vid-assign{margin-top:6px;font-size:12.5px;background:var(--ai-soft);border-radius:8px;padding:6px 10px;white-space:pre-wrap}
+.sg-item{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:10px}
+.sg-head{display:flex;align-items:center;gap:8px}
+.sg-head .res-del{margin-left:auto;flex-shrink:0}
+.sg-date{font-size:12px;color:var(--gray)}
+.sg-note{font-size:12.5px;margin-top:4px;white-space:pre-wrap;color:var(--ink)}
+.sg-status{font-size:12.5px;margin-top:8px}
+.sg-btn{margin:10px 0 0}
+.sg-btn.on{background:#e8efe4;border-color:#4d7a5e;color:#40684f}
 .vid-atts{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px}
 .vid-att{font-size:12px;color:var(--ai);text-decoration:none;border:1px solid var(--ai-soft);border-radius:14px;padding:3px 10px}
 .vid-att:hover{background:var(--ai-soft)}
@@ -351,6 +360,21 @@ a{color:var(--ai)}
   </div>
 </div>
 
+<!-- ===== 参加希望の受付モーダル（編集者以上） ===== -->
+<div class="modal-bg" id="sg-modal">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:420px">
+    <h3>参加希望の受付を追加</h3>
+    <p class="sub" id="sg-modal-room"></p>
+    <label class="form-label">タイトル</label>
+    <input class="form-input" id="sg-title" placeholder="例：11/20（木）夜 FBSラボ（練習会）">
+    <label class="form-label">日付（任意）</label>
+    <input class="form-input" id="sg-date" type="date">
+    <label class="form-label">補足（任意）</label>
+    <textarea class="form-input" id="sg-note" rows="3" placeholder="例：時間・場所の候補、締切など"></textarea>
+    <div style="margin-top:20px"><button class="primary-btn" id="sg-save">受付を開始する</button></div>
+  </div>
+</div>
+
 <!-- ===== セクション編集モーダル（管理者・編集者） ===== -->
 <div class="modal-bg" id="sec-modal">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:480px">
@@ -381,12 +405,14 @@ a{color:var(--ai)}
     <datalist id="vid-type-list"></datalist>
     <label class="form-label">実施日</label>
     <input class="form-input" id="vid-date" type="date">
-    <label class="form-label">Vimeoリンク</label>
+    <label class="form-label">Vimeoリンク（任意・動画がない回は空欄でOK）</label>
     <input class="form-input" id="vid-url" placeholder="https://vimeo.com/…">
     <label class="form-label">パスワード（任意）</label>
     <input class="form-input" id="vid-pw" placeholder="例：SCCP-0815">
     <label class="form-label">概要（任意・検索対象になります）</label>
     <textarea class="form-input" id="vid-desc" rows="4" placeholder="クラスの内容、扱ったテーマなど"></textarea>
+    <label class="form-label">アサインメント（任意）</label>
+    <textarea class="form-input" id="vid-assign" rows="3" placeholder="この回の課題があれば書いてください"></textarea>
     <label class="form-label">この回の資料（任意・複数可）</label>
     <div id="vid-att-list" style="font-size:12.5px"></div>
     <div style="margin-top:6px">
@@ -643,7 +669,7 @@ function openRoom(room){
   S.current = { type:'room', room };
   $('room-title').textContent = room.name;
   updatePinBtn();
-  const tabs = [['pinned','固定情報'],['archive','アーカイブ'],['chat','質問'],['resources','リソース']];
+  const tabs = [['pinned','固定情報'],['archive','クラス記録'],['chat','質問'],['resources','リソース']];
   if (roleIn(room.id) === 'admin') tabs.push(['members','メンバー']);
   $('tabs').innerHTML = tabs.map(([k,label]) =>
     `<div class="tab" data-tab="${k}">${label}</div>`).join('');
@@ -669,10 +695,24 @@ function richText(t){
     return line.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
   }).join('<br>');
 }
-function renderPinned(){
+async function renderPinned(){
   const room = S.current.room;
   const p = room.pinned || {};
   const editor = canEdit(room.id);
+
+  // 参加希望の受付（signups）を取得。テーブル未作成やエラー時はセクションごとスキップ
+  let sgs = [], sgResp = [];
+  const { data: sgData, error: sgErr } = await supa.from('signups').select('*')
+    .eq('room_id', room.id).order('event_date', { ascending: true });
+  if (!sgErr) {
+    sgs = sgData || [];
+    if (sgs.length) {
+      const { data: rd } = await supa.from('signup_responses').select('*').in('signup_id', sgs.map(s => s.id));
+      sgResp = rd || [];
+      await ensureNames(sgResp.map(r => r.user_id));
+    }
+  }
+  if (S.current.room !== room) return;   // 読み込み中にルームが変わったら破棄
   let h = editor ? `<div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="add-res-btn" style="margin-bottom:0" id="edit-info">✏️ 基本情報を編集</button>
       <button class="add-res-btn" style="margin-bottom:0" id="add-sec">＋ セクションを追加</button>
@@ -691,6 +731,20 @@ function renderPinned(){
     </div>`);
   }
   if (half.length) h += `<div class="info-grid">${half.join('')}</div>`;
+  if (!sgErr && (sgs.length || editor)) {
+    h += `<div class="card sg-card"><h3><span class="bar"></span>🙋 参加希望の受付${editor ? `<span style="margin-left:auto"><button class="res-del" id="add-signup" title="受付を追加">＋ 追加</button></span>` : ''}</h3>
+      ${sgs.length ? sgs.map(s => {
+        const rs = sgResp.filter(r => r.signup_id === s.id);
+        const mine = rs.some(r => r.user_id === S.user.id);
+        return `<div class="sg-item">
+          <div class="sg-head"><b>${esc(s.title)}</b>${s.event_date ? `<span class="sg-date">${fmtDay(s.event_date)}</span>` : ''}${editor ? `<button class="res-del" data-sg-del="${s.id}" title="受付を終了して削除">✕</button>` : ''}</div>
+          ${s.note ? `<div class="sg-note">${esc(s.note)}</div>` : ''}
+          <div class="sg-status">現在 <b>${rs.length}</b> 人が参加希望${rs.length ? `：${rs.map(r => esc(S.profilesCache[r.user_id] || '…')).join('、')}` : ''}</div>
+          <button class="add-res-btn sg-btn ${mine ? 'on' : ''}" data-sg-join="${s.id}" data-mine="${mine ? '1' : ''}">${mine ? '✓ 参加希望済み（タップで取り消し）' : '🙋 参加したい'}</button>
+        </div>`;
+      }).join('') : `<div class="empty" style="padding:8px 0">いま受付中のものはありません</div>`}
+    </div>`;
+  }
   if (p.schedule?.length) {
     h += `<div class="card"><h3><span class="bar"></span>${esc(p.schedule_title || 'スケジュール')}</h3>
       <ul class="sched">${p.schedule.map(s => `<li>${esc(s)}</li>`).join('')}</ul>
@@ -721,6 +775,31 @@ function renderPinned(){
   $('page').innerHTML = h || `<div class="empty">固定情報はまだありません</div>`;
   const ei = $('edit-info'); if (ei) ei.onclick = openInfoModal;
   const as = $('add-sec'); if (as) as.onclick = () => openSecModal(null);
+  const asg = $('add-signup'); if (asg) asg.onclick = () => {
+    ['sg-title','sg-date','sg-note'].forEach(id => $(id).value = '');
+    $('sg-modal-room').textContent = S.current.room.name + ' の固定情報に表示されます';
+    $('sg-modal').style.display = 'flex';
+  };
+  $('page').querySelectorAll('[data-sg-join]').forEach(el => el.onclick = async () => {
+    const id = el.dataset.sgJoin;
+    const joined = !!el.dataset.mine;
+    el.disabled = true;
+    const q = joined
+      ? supa.from('signup_responses').delete().eq('signup_id', id).eq('user_id', S.user.id)
+      : supa.from('signup_responses').insert({ signup_id: id, user_id: S.user.id });
+    const { error } = await q;
+    el.disabled = false;
+    if (error) return toast('更新に失敗しました：' + error.message);
+    toast(joined ? '参加希望を取り消しました' : '参加希望を送りました！');
+    renderPinned();
+  });
+  $('page').querySelectorAll('[data-sg-del]').forEach(el => el.onclick = async () => {
+    if (!confirm('この受付を終了して削除しますか？（参加希望の記録も消えます）')) return;
+    const { error } = await supa.from('signups').delete().eq('id', el.dataset.sgDel);
+    if (error) return toast('削除に失敗しました：' + error.message);
+    toast('受付を削除しました');
+    renderPinned();
+  });
   $('page').querySelectorAll('[data-sedit]').forEach(el => el.onclick = () => openSecModal(Number(el.dataset.sedit)));
   $('page').querySelectorAll('[data-sdel]').forEach(el => el.onclick = async () => {
     if (!confirm('このセクションを削除しますか？')) return;
@@ -836,11 +915,11 @@ function drawArchive(){
   const editor = canEdit(S.current.room.id);
   const list = S.videos.filter(v =>
     (S.videoFilter === 'すべて' || v.class_type === S.videoFilter) &&
-    (!q || (v.title + ' ' + (v.description||'')).toLowerCase().includes(q)));
+    (!q || (v.title + ' ' + (v.description||'') + ' ' + (v.assignment||'')).toLowerCase().includes(q)));
   $('page').innerHTML = `
-    ${editor ? `<button class="add-res-btn" id="add-vid">＋ 動画を追加</button>` : ''}
+    ${editor ? `<button class="add-res-btn" id="add-vid">＋ クラス回を追加</button>` : ''}
     <div class="filters">${types.map(t => `<div class="chip ${t===S.videoFilter?'on':''}" data-f="${esc(t)}">${esc(t)}</div>`).join('')}</div>
-    <input class="search-box" id="v-search" placeholder="🔍 概要文で検索…" value="${esc(S.videoSearch)}">
+    <input class="search-box" id="v-search" placeholder="🔍 概要・アサインメントで検索…" value="${esc(S.videoSearch)}">
     ${list.length ? list.map(v => `
       <div class="video-row" data-vrow="${v.id}">
         ${v.vimeo_url ? `<a class="thumb" href="${esc(v.vimeo_url)}" target="_blank" rel="noopener" title="動画を開く">▶</a>` : `<div class="thumb">▶</div>`}
@@ -848,6 +927,7 @@ function drawArchive(){
           <div class="video-title">${esc(v.title)}</div>
           <div class="video-sub">${fmtMonth(v.session_date)}${v.description ? ' ・ ' + esc(v.description) : ''}</div>
           ${v.vimeo_url ? `<a class="video-open-link" href="${esc(v.vimeo_url)}" target="_blank" rel="noopener">▶ 動画を開く</a>` : ''}
+          ${v.assignment ? `<div class="vid-assign">📝 <b>アサインメント</b>：${esc(v.assignment)}</div>` : ''}
           ${(v.attachments || []).length ? `<div class="vid-atts">${v.attachments.map(a =>
             `<a class="vid-att" href="${esc(a.url)}" target="_blank" rel="noopener">📎 ${esc(a.name)}</a>`).join('')}</div>` : ''}
         </div>
@@ -867,7 +947,7 @@ function drawArchive(){
   });
   $('page').querySelectorAll('[data-vdel]').forEach(el => el.onclick = async e => {
     e.preventDefault(); e.stopPropagation();
-    if (!confirm('この動画をアーカイブから削除しますか？')) return;
+    if (!confirm('この回をクラス記録から削除しますか？')) return;
     const { error } = await supa.from('videos').delete().eq('id', el.dataset.vdel);
     if (error) return toast('削除に失敗しました：' + error.message);
     toast('削除しました');
@@ -1136,6 +1216,23 @@ async function renderResources(){
     renderResources();
   });
 }
+$('sg-modal').onclick = () => $('sg-modal').style.display = 'none';
+$('sg-save').onclick = async () => {
+  const title = $('sg-title').value.trim();
+  if (!title) return toast('タイトルは必須です');
+  const { error } = await supa.from('signups').insert({
+    room_id: S.current.room.id,
+    title,
+    event_date: $('sg-date').value || null,
+    note: $('sg-note').value.trim() || null,
+    created_by: S.user.id,
+  });
+  if (error) return toast('追加に失敗しました：' + error.message);
+  $('sg-modal').style.display = 'none';
+  toast('受付を開始しました');
+  renderPinned();
+};
+
 function openToolModal(t){
   S.editingTool = t || null;
   S.toolFileUrl = t?.file_url || null;
@@ -1187,8 +1284,8 @@ $('tool-save').onclick = async () => {
 /* ===== 動画の追加・編集（管理者・編集者） ===== */
 function openVidModal(v){
   S.editingVideo = v || null;
-  $('vid-modal-title').textContent = v ? '動画を編集' : '動画を追加';
-  $('vid-modal-room').textContent = S.current.room.name + ' のアーカイブ';
+  $('vid-modal-title').textContent = v ? 'クラス回を編集' : 'クラス回を追加';
+  $('vid-modal-room').textContent = S.current.room.name + ' のクラス記録';
   $('vid-type-list').innerHTML = [...new Set(S.videos.map(x => x.class_type))].map(t => `<option value="${esc(t)}">`).join('');
   $('vid-title').value = v?.title || '';
   $('vid-type').value = v?.class_type || '';
@@ -1196,6 +1293,7 @@ function openVidModal(v){
   $('vid-url').value = v?.vimeo_url || '';
   $('vid-pw').value = v?.password || '';
   $('vid-desc').value = v?.description || '';
+  $('vid-assign').value = v?.assignment || '';
   S.vidAtts = structuredClone(v?.attachments || []);
   $('vid-att-status').textContent = '';
   drawVidAtts();
@@ -1238,6 +1336,7 @@ $('vid-save').onclick = async () => {
     vimeo_url: $('vid-url').value.trim() || null,
     password: $('vid-pw').value.trim() || null,
     description: $('vid-desc').value.trim() || null,
+    assignment: $('vid-assign').value.trim() || null,
     attachments: S.vidAtts || [],
   };
   const q = S.editingVideo
@@ -1246,7 +1345,7 @@ $('vid-save').onclick = async () => {
   const { error } = await q;
   if (error) return toast('保存に失敗しました：' + error.message);
   $('vid-modal').style.display = 'none';
-  toast(S.editingVideo ? '動画を更新しました' : '動画を追加しました');
+  toast(S.editingVideo ? 'クラス回を更新しました' : 'クラス回を追加しました');
   renderArchive();
 };
 
@@ -1430,7 +1529,7 @@ async function openHome(){
       <div class="feed-item">
         <div class="avatar">▶</div>
         <div class="feed-body">
-          <div class="feed-meta">アーカイブに追加<span class="room-chip">${esc(roomName(i.v.room_id))}</span> ・ ${fmtDay(i.t)}</div>
+          <div class="feed-meta">クラス記録に追加<span class="room-chip">${esc(roomName(i.v.room_id))}</span> ・ ${fmtDay(i.t)}</div>
           <div class="feed-text">🎥 ${esc(i.v.title)}</div>
         </div>
       </div>`).join('') : `<div class="empty">まだ新着はありません</div>`}
