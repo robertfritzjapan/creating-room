@@ -162,6 +162,10 @@ a{color:var(--ai)}
 .tool-section .tool-card{background:var(--white);border-color:#dde5da}
 .tool-section .tool-link{color:#40684f;border-color:#dfe9db}
 .tool-section .tool-link:hover{background:#e8efe4}
+.tool-text{position:relative;background:var(--washi);border-radius:8px;padding:10px 12px;margin-top:10px}
+.tool-text pre{white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.7;max-height:200px;overflow:auto;margin:0;padding-right:74px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.copy-btn{position:absolute;top:8px;right:8px;font-size:11px;border:1px solid var(--line);background:var(--white);border-radius:14px;padding:3px 10px;cursor:pointer}
+.copy-btn:hover{background:#e8efe4}
 .tool-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
 .tool-name{font-weight:600;font-size:14px}
 .tool-by{font-size:11px;color:var(--gray);margin-top:2px}
@@ -408,6 +412,12 @@ a{color:var(--ai)}
     <input class="form-input" id="res-sub" placeholder="例：認定取得の方法、提出するべきレポートなど">
     <label class="form-label">リンクURL（任意）</label>
     <input class="form-input" id="res-url" placeholder="https://…">
+    <div style="margin-top:10px">
+      <input type="file" id="res-file" style="display:none">
+      <button class="add-res-btn" style="margin-bottom:0" id="res-file-btn">📎 ファイルをアップロード</button>
+      <span class="muted" id="res-file-status"></span>
+    </div>
+    <p class="sub" style="margin-top:4px">PDF・HTML・画像など何でもOK。ファイルを付けた場合は、クリックでファイルが開きます。</p>
     <label class="form-label">アイコン（絵文字1つ・任意）</label>
     <input class="form-input" id="res-icon" placeholder="📄" maxlength="4" style="width:80px">
     <div style="margin-top:20px"><button class="primary-btn" id="res-save">追加する</button></div>
@@ -430,6 +440,8 @@ a{color:var(--ai)}
       <button class="add-res-btn" style="margin-bottom:0" id="tool-file-btn">📎 ファイルをアップロード</button>
       <span class="muted" id="tool-file-status"></span>
     </div>
+    <label class="form-label">共有テキスト（プロンプトなど・任意）</label>
+    <textarea class="form-input" id="tool-content" rows="6" placeholder="ここに貼ったテキストはカードに表示され、メンバーがワンタップでコピーできます"></textarea>
     <div style="margin-top:20px"><button class="primary-btn" id="tool-save">保存する</button></div>
   </div>
 </div>
@@ -1003,6 +1015,7 @@ function toolCardHtml(t, reviewsByTool, isEditor){
       ${isEditor ? `<span class="tool-actions"><button class="res-del" data-tedit="${t.id}" title="編集">✏️</button><button class="res-del" data-tdel="${t.id}" title="削除">✕</button></span>` : ''}
     </div>
     ${t.description ? `<div class="tool-desc">${esc(t.description)}</div>` : ''}
+    ${t.content ? `<div class="tool-text"><button class="copy-btn" data-copy="${t.id}">📋 コピー</button><pre>${esc(t.content)}</pre></div>` : ''}
     ${linkHtml}
     <div class="tool-reviews">
       <div class="tool-reviews-title">使い手の声（${revs.length}）</div>
@@ -1061,10 +1074,11 @@ async function renderResources(){
     resSection = addBtn + Object.entries(groups).map(([cat, items]) => `
       <div class="card"><h3><span class="bar"></span>${esc(cat)}</h3>
         ${items.map(r => `
-          <a class="res-item" ${r.url ? `href="${esc(r.url)}" target="_blank" rel="noopener"` : ''}>
+          <a class="res-item" ${(r.file_url || r.url) ? `href="${esc(r.file_url || r.url)}" target="_blank" rel="noopener"` : ''}>
             <div class="res-icon">${esc(r.icon || '📄')}</div>
             <div><div class="res-name">${esc(r.title)}</div>
-            ${r.subtitle ? `<div class="res-sub">${esc(r.subtitle)}</div>` : ''}</div>
+            ${r.subtitle ? `<div class="res-sub">${esc(r.subtitle)}</div>` : ''}
+            ${r.file_url ? `<div class="res-sub">📎 ${esc(r.file_name || 'ファイル')}</div>` : ''}</div>
             ${isEditor ? `<button class="res-del" data-del="${r.id}" title="削除">✕</button>` : ''}
           </a>`).join('')}
       </div>`).join('');
@@ -1090,6 +1104,12 @@ async function renderResources(){
     if (error) return toast('削除に失敗しました：' + error.message);
     toast('削除しました');
     renderResources();
+  });
+  $('page').querySelectorAll('[data-copy]').forEach(el => el.onclick = async () => {
+    const t = S.toolsCache.find(x => x.id === el.dataset.copy);
+    if (!t?.content) return;
+    try { await navigator.clipboard.writeText(t.content); toast('コピーしました'); }
+    catch (_) { toast('コピーできませんでした'); }
   });
   $('page').querySelectorAll('[data-review-send]').forEach(el => el.onclick = async () => {
     const toolId = el.dataset.reviewSend;
@@ -1124,6 +1144,7 @@ function openToolModal(t){
   $('tool-modal-room').textContent = S.current.room.name + ' のツールに追加されます';
   $('tool-name').value = t?.name || '';
   $('tool-desc').value = t?.description || '';
+  $('tool-content').value = t?.content || '';
   $('tool-url').value = t?.url || '';
   $('tool-file').value = '';
   $('tool-file-status').textContent = t?.file_name ? `現在のファイル：${t.file_name}` : '';
@@ -1149,6 +1170,7 @@ $('tool-save').onclick = async () => {
   const row = {
     name,
     description: $('tool-desc').value.trim() || null,
+    content: $('tool-content').value.trim() ? $('tool-content').value : null,
     url: $('tool-url').value.trim() || null,
     file_url: S.toolFileUrl || null,
     file_name: S.toolFileName || null,
@@ -1232,9 +1254,26 @@ function openResModal(){
   $('res-modal-room').textContent = S.current.room.name + ' のリソースに追加されます';
   $('res-cat-list').innerHTML = (S.resCats || []).map(c => `<option value="${esc(c)}">`).join('');
   ['res-cat','res-title','res-sub','res-url','res-icon'].forEach(id => $(id).value = '');
+  S.resFileUrl = null; S.resFileName = null;
+  $('res-file').value = '';
+  $('res-file-status').textContent = '';
   $('res-modal').style.display = 'flex';
 }
 $('res-modal').onclick = () => $('res-modal').style.display = 'none';
+$('res-file-btn').onclick = () => $('res-file').click();
+$('res-file').onchange = async () => {
+  const file = $('res-file').files[0];
+  if (!file) return;
+  $('res-file-status').textContent = 'アップロード中…';
+  const path = `${S.current.room.slug}/resources/${Date.now()}-${file.name.replace(/[^\w.\-]+/g, '_')}`;
+  const { error } = await supa.storage.from('room-media').upload(path, file);
+  if (error) { $('res-file-status').textContent = ''; return toast('アップロードに失敗しました：' + error.message); }
+  const { data } = supa.storage.from('room-media').getPublicUrl(path);
+  S.resFileUrl = data.publicUrl;
+  S.resFileName = file.name;
+  $('res-file-status').textContent = `✓ ${file.name}`;
+  $('res-file').value = '';
+};
 $('res-save').onclick = async () => {
   const cat = $('res-cat').value.trim(), title = $('res-title').value.trim();
   if (!cat || !title) return toast('カテゴリとタイトルは必須です');
@@ -1244,6 +1283,8 @@ $('res-save').onclick = async () => {
     title,
     subtitle: $('res-sub').value.trim() || null,
     url: $('res-url').value.trim() || null,
+    file_url: S.resFileUrl || null,
+    file_name: S.resFileName || null,
     icon: $('res-icon').value.trim() || '📄',
     sort_order: 100,
   });
