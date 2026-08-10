@@ -439,13 +439,14 @@ a{color:var(--ai)}
     <input class="form-input" id="res-sub" placeholder="例：認定取得の方法、提出するべきレポートなど">
     <label class="form-label">リンクURL（任意）</label>
     <input class="form-input" id="res-url" placeholder="https://…">
-    <div style="margin-top:10px">
-      <input type="file" id="res-file" style="display:none">
-      <button class="add-res-btn" style="margin-bottom:0" id="res-file-btn">📎 ファイルをアップロード</button>
+    <label class="form-label">添付ファイル（任意・複数可）</label>
+    <div id="res-att-list" style="font-size:12.5px"></div>
+    <div style="margin-top:6px">
+      <input type="file" id="res-file" style="display:none" multiple>
+      <button class="add-res-btn" style="margin-bottom:0" id="res-file-btn">📎 ファイルを追加</button>
       <span class="muted" id="res-file-status"></span>
-      <button class="res-del" id="res-file-clear" title="ファイルを外す" style="display:none">✕</button>
     </div>
-    <p class="sub" style="margin-top:4px">PDF・HTML・画像など何でもOK。ファイルを付けた場合は、クリックでファイルが開きます。</p>
+    <p class="sub" style="margin-top:4px">PDF・画像はクリックでそのまま開きます。HTMLはダウンロードして開く形になります。</p>
     <label class="form-label">アイコン（絵文字1つ・任意）</label>
     <input class="form-input" id="res-icon" placeholder="📄" maxlength="4" style="width:80px">
     <div style="margin-top:20px"><button class="primary-btn" id="res-save">追加する</button></div>
@@ -703,6 +704,10 @@ async function uploadRoomFile(file, subdir){
   const { data } = supa.storage.from('room-media').getPublicUrl(path);
   return { name: file.name, url: data.publicUrl };
 }
+/* HTMLファイルはSupabaseの仕様でページ表示できない（ソースが素で見える）ため、ダウンロードで開いてもらう */
+function fileHref(a){
+  return /\.html?$/i.test(a.name || '') ? a.url + '?download=' + encodeURIComponent(a.name) : a.url;
+}
 
 /* ===== 固定情報 ===== */
 function richText(t){
@@ -949,7 +954,7 @@ function drawArchive(){
           ${v.vimeo_url ? `<a class="video-open-link" href="${esc(v.vimeo_url)}" target="_blank" rel="noopener">▶ 動画を開く</a>` : ''}
           ${v.assignment ? `<div class="vid-assign">📝 <b>アサインメント</b>：${esc(v.assignment)}</div>` : ''}
           ${(v.attachments || []).length ? `<div class="vid-atts">${v.attachments.map(a =>
-            `<a class="vid-att" href="${esc(a.url)}" target="_blank" rel="noopener">📎 ${esc(a.name)}</a>`).join('')}</div>` : ''}
+            `<a class="vid-att" href="${esc(fileHref(a))}" target="_blank" rel="noopener">📎 ${esc(a.name)}</a>`).join('')}</div>` : ''}
         </div>
         ${v.password ? `<span class="pw" data-pw="${esc(v.password)}" title="タップでコピー">${esc(v.password)}</span>` : ''}
         ${editor ? `<button class="res-del" data-vedit="${v.id}" title="編集">✏️</button><button class="res-del" data-vdel="${v.id}" title="削除">✕</button>` : ''}
@@ -1106,7 +1111,7 @@ function toolCardHtml(t, reviewsByTool, isEditor){
   const atts = (t.attachments && t.attachments.length) ? t.attachments
     : (t.file_url ? [{ name: t.file_name || 'ファイルを開く', url: t.file_url }] : []);
   const linkHtml = `<div class="tool-links">${[
-    ...atts.map(a => `<a class="tool-link" href="${esc(a.url)}" target="_blank" rel="noopener">📎 ${esc(a.name)}</a>`),
+    ...atts.map(a => `<a class="tool-link" href="${esc(fileHref(a))}" target="_blank" rel="noopener">📎 ${esc(a.name)}</a>`),
     t.url ? `<a class="tool-link" href="${esc(t.url)}" target="_blank" rel="noopener">🔗 リンクを開く</a>` : ''
   ].filter(Boolean).join('')}</div>`;
   return `<div class="tool-card" data-tool="${t.id}">
@@ -1178,13 +1183,19 @@ async function renderResources(){
     resSection = addBtn + Object.entries(groups).map(([cat, items]) => `
       <div class="card"><h3><span class="bar"></span>${esc(cat)}</h3>
         ${items.map(r => `
-          <a class="res-item" ${(r.file_url || r.url) ? `href="${esc(r.file_url || r.url)}" target="_blank" rel="noopener"` : ''}>
+          ${(() => {
+            const atts = (r.attachments && r.attachments.length) ? r.attachments
+              : (r.file_url ? [{ name: r.file_name || 'ファイル', url: r.file_url }] : []);
+            const target = r.url || (atts.length === 1 ? fileHref(atts[0]) : '');
+            return `<div class="res-item" ${target ? `data-open="${esc(target)}" style="cursor:pointer"` : ''}>
             <div class="res-icon">${esc(r.icon || '📄')}</div>
-            <div><div class="res-name">${esc(r.title)}</div>
+            <div style="min-width:0"><div class="res-name">${esc(r.title)}</div>
             ${r.subtitle ? `<div class="res-sub">${esc(r.subtitle)}</div>` : ''}
-            ${r.file_url ? `<div class="res-sub">📎 ${esc(r.file_name || 'ファイル')}</div>` : ''}</div>
+            ${atts.length ? `<div class="vid-atts" style="margin-top:5px">${atts.map(a =>
+              `<a class="vid-att" href="${esc(fileHref(a))}" target="_blank" rel="noopener">📎 ${esc(a.name)}</a>`).join('')}</div>` : ''}</div>`;
+          })()}
             ${isEditor ? `<button class="res-del" data-redit="${r.id}" title="編集">✏️</button><button class="res-del" data-del="${r.id}" title="削除">✕</button>` : ''}
-          </a>`).join('')}
+          </div>`).join('')}
       </div>`).join('');
   }
 
@@ -1231,6 +1242,10 @@ async function renderResources(){
 
   const ab = $('add-res');
   if (ab) ab.onclick = () => openResModal(null);
+  $('page').querySelectorAll('[data-open]').forEach(el => el.onclick = e => {
+    if (e.target.closest('a, button')) return;
+    window.open(el.dataset.open, '_blank', 'noopener');
+  });
   $('page').querySelectorAll('[data-redit]').forEach(el => el.onclick = e => {
     e.preventDefault(); e.stopPropagation();
     openResModal((S.resCache || []).find(r => r.id === el.dataset.redit) || null);
@@ -1403,36 +1418,41 @@ function openResModal(r){
   $('res-sub').value = r?.subtitle || '';
   $('res-url').value = r?.url || '';
   $('res-icon').value = r?.icon || '';
-  S.resFileUrl = r?.file_url || null;
-  S.resFileName = r?.file_name || null;
+  S.resAtts = structuredClone(
+    (r?.attachments && r.attachments.length) ? r.attachments
+    : (r?.file_url ? [{ name: r.file_name || 'ファイル', url: r.file_url }] : [])
+  );
+  drawResAtts();
   $('res-file').value = '';
-  updateResFileStatus();
+  $('res-file-status').textContent = '';
   $('res-modal').style.display = 'flex';
 }
-function updateResFileStatus(){
-  $('res-file-status').textContent = S.resFileName ? `✓ ${S.resFileName}` : '';
-  $('res-file-clear').style.display = S.resFileName ? '' : 'none';
+function drawResAtts(){
+  $('res-att-list').innerHTML = (S.resAtts || []).map((a, i) =>
+    `<div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📎 ${esc(a.name)}</span>
+      <button class="res-del" data-radel="${i}" title="削除">✕</button>
+    </div>`).join('');
+  $('res-att-list').querySelectorAll('[data-radel]').forEach(el => el.onclick = () => {
+    S.resAtts.splice(Number(el.dataset.radel), 1);
+    drawResAtts();
+  });
 }
-$('res-file-clear').onclick = () => {
-  S.resFileUrl = null; S.resFileName = null;
-  updateResFileStatus();
-};
 $('res-modal').onclick = () => $('res-modal').style.display = 'none';
 $('res-file-btn').onclick = () => $('res-file').click();
 $('res-file').onchange = async () => {
-  const file = $('res-file').files[0];
-  if (!file) return;
+  const files = [...$('res-file').files];
+  if (!files.length) return;
   $('res-file-status').textContent = 'アップロード中…';
   try {
-    const up = await uploadRoomFile(file, 'resources');
-    S.resFileUrl = up.url;
-    S.resFileName = up.name;
-    updateResFileStatus();
+    for (const file of files) S.resAtts.push(await uploadRoomFile(file, 'resources'));
   } catch (err) {
     $('res-file-status').textContent = '';
     return toast('アップロードに失敗しました：' + err.message);
   }
+  $('res-file-status').textContent = '';
   $('res-file').value = '';
+  drawResAtts();
 };
 $('res-save').onclick = async () => {
   const cat = $('res-cat').value.trim(), title = $('res-title').value.trim();
@@ -1442,8 +1462,9 @@ $('res-save').onclick = async () => {
     title,
     subtitle: $('res-sub').value.trim() || null,
     url: $('res-url').value.trim() || null,
-    file_url: S.resFileUrl || null,
-    file_name: S.resFileName || null,
+    attachments: S.resAtts || [],
+    file_url: null,
+    file_name: null,
     icon: $('res-icon').value.trim() || '📄',
   };
   const q = S.editingRes
