@@ -1,7 +1,7 @@
 /* Creating Room — Service Worker
    v19以降：ページ本体（HTML）はネットワーク優先（常に最新を取得、オフライン時のみキャッシュ）。
    その他の静的ファイルはキャッシュ優先＋裏で更新（stale-while-revalidate）。 */
-const CACHE = 'creating-room-v20';
+const CACHE = 'creating-room-v21';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './vendor/supabase.js', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => {

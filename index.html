@@ -337,9 +337,9 @@ a{color:var(--ai)}
     <textarea class="form-input" id="inf-sched" rows="4"></textarea>
     <label class="form-label">補足メモ</label>
     <textarea class="form-input" id="inf-note" rows="2"></textarea>
-    <label class="form-label">GoogleカレンダーID（任意）</label>
-    <input class="form-input" id="inf-gcal" placeholder="例：xxxxx@group.calendar.google.com">
-    <p class="sub" style="margin-top:4px">このルームの予定カレンダーを固定情報に埋め込みます。カレンダーは「一般公開」設定が必要です。</p>
+    <label class="form-label">GoogleカレンダーID（任意・複数可）</label>
+    <textarea class="form-input" id="inf-gcal" rows="2" placeholder="1行に1つ　例：xxxxx@group.calendar.google.com"></textarea>
+    <p class="sub" style="margin-top:4px">このルームの固定情報にカレンダーを埋め込みます。複数入れると重ねて表示されます。各カレンダーは「一般公開」設定が必要です。</p>
     <div style="margin-top:20px"><button class="primary-btn" id="info-save">保存する</button></div>
   </div>
 </div>
@@ -677,9 +677,11 @@ function renderPinned(){
   } else if (p.note) {
     h += `<div class="card"><p style="font-size:13px">${esc(p.note)}</p></div>`;
   }
-  if (p.gcal) {
+  const gcalIds = (Array.isArray(p.gcal) ? p.gcal : [p.gcal]).filter(Boolean);
+  if (gcalIds.length) {
     const gmode = window.innerWidth < 600 ? 'AGENDA' : 'MONTH';
-    const gsrc = 'https://calendar.google.com/calendar/embed?src=' + encodeURIComponent(p.gcal)
+    const gsrc = 'https://calendar.google.com/calendar/embed?'
+      + gcalIds.map(id => 'src=' + encodeURIComponent(id)).join('&')
       + '&ctz=Asia%2FTokyo&hl=ja&mode=' + gmode + '&showTitle=0&showPrint=0&showCalendars=0&showTz=0';
     h += `<div class="card"><h3><span class="bar"></span>カレンダー</h3>
       <div class="gcal-wrap"><iframe src="${gsrc}" loading="lazy" title="ルームカレンダー"></iframe></div>
@@ -725,7 +727,7 @@ function openInfoModal(){
   $('inf-sched-title').value = p.schedule_title || '';
   $('inf-sched').value = (p.schedule || []).join('\n');
   $('inf-note').value = p.note || '';
-  $('inf-gcal').value = p.gcal || '';
+  $('inf-gcal').value = (Array.isArray(p.gcal) ? p.gcal : [p.gcal]).filter(Boolean).join('\n');
   $('info-modal').style.display = 'flex';
 }
 $('info-modal').onclick = () => $('info-modal').style.display = 'none';
@@ -740,10 +742,11 @@ $('info-save').onclick = async () => {
   pinned.schedule_title = $('inf-sched-title').value.trim();
   pinned.schedule = $('inf-sched').value.split('\n').map(l => l.trim()).filter(Boolean);
   pinned.note = $('inf-note').value.trim();
-  const gcalRaw = $('inf-gcal').value.trim();
-  const gcalM = gcalRaw.match(/[?&]src=([^&]+)/);
-  pinned.gcal = gcalM ? decodeURIComponent(gcalM[1]) : gcalRaw;
-  if (!pinned.gcal) delete pinned.gcal;
+  pinned.gcal = $('inf-gcal').value.split(/[\n,]+/).map(l => {
+    const m = l.match(/[?&]src=([^&\s]+)/);
+    return (m ? decodeURIComponent(m[1]) : l).trim();
+  }).filter(Boolean);
+  if (!pinned.gcal.length) delete pinned.gcal;
   if (pinned.zoom === undefined) delete pinned.zoom;
   if (await savePinned(pinned)) {
     $('info-modal').style.display = 'none';
