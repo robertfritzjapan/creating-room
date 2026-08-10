@@ -147,6 +147,9 @@ a{color:var(--ai)}
 .res-sub{font-size:11.5px;color:var(--gray)}
 
 /* ===== ツール ===== */
+.vid-atts{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px}
+.vid-att{font-size:12px;color:var(--ai);text-decoration:none;border:1px solid var(--ai-soft);border-radius:14px;padding:3px 10px}
+.vid-att:hover{background:var(--ai-soft)}
 .gcal-wrap{width:100%;overflow:hidden;border-radius:8px;border:1px solid var(--line)}
 .gcal-wrap iframe{width:100%;height:620px;border:0;display:block}
 @media (max-width:600px){.gcal-wrap iframe{height:480px}}
@@ -380,6 +383,13 @@ a{color:var(--ai)}
     <input class="form-input" id="vid-pw" placeholder="例：SCCP-0815">
     <label class="form-label">概要（任意・検索対象になります）</label>
     <textarea class="form-input" id="vid-desc" rows="4" placeholder="クラスの内容、扱ったテーマなど"></textarea>
+    <label class="form-label">この回の資料（任意・複数可）</label>
+    <div id="vid-att-list" style="font-size:12.5px"></div>
+    <div style="margin-top:6px">
+      <input type="file" id="vid-att-file" style="display:none" multiple>
+      <button class="add-res-btn" style="margin-bottom:0" id="vid-att-btn">📎 資料を追加</button>
+      <span class="muted" id="vid-att-status"></span>
+    </div>
     <div style="margin-top:20px"><button class="primary-btn" id="vid-save">保存する</button></div>
   </div>
 </div>
@@ -826,6 +836,8 @@ function drawArchive(){
           <div class="video-title">${esc(v.title)}</div>
           <div class="video-sub">${fmtMonth(v.session_date)}${v.description ? ' ・ ' + esc(v.description) : ''}</div>
           ${v.vimeo_url ? `<a class="video-open-link" href="${esc(v.vimeo_url)}" target="_blank" rel="noopener">▶ 動画を開く</a>` : ''}
+          ${(v.attachments || []).length ? `<div class="vid-atts">${v.attachments.map(a =>
+            `<a class="vid-att" href="${esc(a.url)}" target="_blank" rel="noopener">📎 ${esc(a.name)}</a>`).join('')}</div>` : ''}
         </div>
         ${v.password ? `<span class="pw" data-pw="${esc(v.password)}" title="タップでコピー">${esc(v.password)}</span>` : ''}
         ${editor ? `<button class="res-del" data-vedit="${v.id}" title="編集">✏️</button><button class="res-del" data-vdel="${v.id}" title="削除">✕</button>` : ''}
@@ -1162,8 +1174,39 @@ function openVidModal(v){
   $('vid-url').value = v?.vimeo_url || '';
   $('vid-pw').value = v?.password || '';
   $('vid-desc').value = v?.description || '';
+  S.vidAtts = structuredClone(v?.attachments || []);
+  $('vid-att-status').textContent = '';
+  drawVidAtts();
   $('vid-modal').style.display = 'flex';
 }
+function drawVidAtts(){
+  $('vid-att-list').innerHTML = (S.vidAtts || []).map((a, i) =>
+    `<div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📎 ${esc(a.name)}</span>
+      <button class="res-del" data-adel="${i}" title="削除">✕</button>
+    </div>`).join('');
+  $('vid-att-list').querySelectorAll('[data-adel]').forEach(el => el.onclick = () => {
+    S.vidAtts.splice(Number(el.dataset.adel), 1);
+    drawVidAtts();
+  });
+}
+$('vid-att-btn').onclick = () => $('vid-att-file').click();
+$('vid-att-file').onchange = async () => {
+  const files = [...$('vid-att-file').files];
+  if (!files.length) return;
+  $('vid-att-status').textContent = 'アップロード中…';
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const path = `${S.current.room.slug}/materials/${Date.now()}-${i}-${file.name.replace(/[^\w.\-]+/g, '_')}`;
+    const { error } = await supa.storage.from('room-media').upload(path, file);
+    if (error) { $('vid-att-status').textContent = ''; return toast('アップロードに失敗しました：' + error.message); }
+    const { data } = supa.storage.from('room-media').getPublicUrl(path);
+    S.vidAtts.push({ name: file.name, url: data.publicUrl });
+  }
+  $('vid-att-status').textContent = '';
+  $('vid-att-file').value = '';
+  drawVidAtts();
+};
 $('vid-modal').onclick = () => $('vid-modal').style.display = 'none';
 $('vid-save').onclick = async () => {
   const title = $('vid-title').value.trim(), type = $('vid-type').value.trim(), date = $('vid-date').value;
@@ -1173,6 +1216,7 @@ $('vid-save').onclick = async () => {
     vimeo_url: $('vid-url').value.trim() || null,
     password: $('vid-pw').value.trim() || null,
     description: $('vid-desc').value.trim() || null,
+    attachments: S.vidAtts || [],
   };
   const q = S.editingVideo
     ? supa.from('videos').update(row).eq('id', S.editingVideo.id)
