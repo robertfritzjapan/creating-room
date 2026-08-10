@@ -147,6 +147,9 @@ a{color:var(--ai)}
 .res-sub{font-size:11.5px;color:var(--gray)}
 
 /* ===== ツール ===== */
+.gcal-wrap{width:100%;overflow:hidden;border-radius:8px;border:1px solid var(--line)}
+.gcal-wrap iframe{width:100%;height:620px;border:0;display:block}
+@media (max-width:600px){.gcal-wrap iframe{height:480px}}
 .tool-card{border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
 .tool-section{background:#f4f7f3;border-color:#d9e3d5}
 .tool-section h3{color:#40684f}
@@ -334,6 +337,9 @@ a{color:var(--ai)}
     <textarea class="form-input" id="inf-sched" rows="4"></textarea>
     <label class="form-label">補足メモ</label>
     <textarea class="form-input" id="inf-note" rows="2"></textarea>
+    <label class="form-label">GoogleカレンダーID（任意）</label>
+    <input class="form-input" id="inf-gcal" placeholder="例：xxxxx@group.calendar.google.com">
+    <p class="sub" style="margin-top:4px">このルームの予定カレンダーを固定情報に埋め込みます。カレンダーは「一般公開」設定が必要です。</p>
     <div style="margin-top:20px"><button class="primary-btn" id="info-save">保存する</button></div>
   </div>
 </div>
@@ -671,6 +677,14 @@ function renderPinned(){
   } else if (p.note) {
     h += `<div class="card"><p style="font-size:13px">${esc(p.note)}</p></div>`;
   }
+  if (p.gcal) {
+    const gmode = window.innerWidth < 600 ? 'AGENDA' : 'MONTH';
+    const gsrc = 'https://calendar.google.com/calendar/embed?src=' + encodeURIComponent(p.gcal)
+      + '&ctz=Asia%2FTokyo&hl=ja&mode=' + gmode + '&showTitle=0&showPrint=0&showCalendars=0&showTz=0';
+    h += `<div class="card"><h3><span class="bar"></span>カレンダー</h3>
+      <div class="gcal-wrap"><iframe src="${gsrc}" loading="lazy" title="ルームカレンダー"></iframe></div>
+    </div>`;
+  }
   (p.sections || []).forEach((s, idx) => {
     const btns = editor
       ? `<span style="margin-left:auto;flex-shrink:0"><button class="res-del" data-sedit="${idx}" title="編集">✏️</button><button class="res-del" data-sdel="${idx}" title="削除">✕</button></span>`
@@ -711,6 +725,7 @@ function openInfoModal(){
   $('inf-sched-title').value = p.schedule_title || '';
   $('inf-sched').value = (p.schedule || []).join('\n');
   $('inf-note').value = p.note || '';
+  $('inf-gcal').value = p.gcal || '';
   $('info-modal').style.display = 'flex';
 }
 $('info-modal').onclick = () => $('info-modal').style.display = 'none';
@@ -725,6 +740,10 @@ $('info-save').onclick = async () => {
   pinned.schedule_title = $('inf-sched-title').value.trim();
   pinned.schedule = $('inf-sched').value.split('\n').map(l => l.trim()).filter(Boolean);
   pinned.note = $('inf-note').value.trim();
+  const gcalRaw = $('inf-gcal').value.trim();
+  const gcalM = gcalRaw.match(/[?&]src=([^&]+)/);
+  pinned.gcal = gcalM ? decodeURIComponent(gcalM[1]) : gcalRaw;
+  if (!pinned.gcal) delete pinned.gcal;
   if (pinned.zoom === undefined) delete pinned.zoom;
   if (await savePinned(pinned)) {
     $('info-modal').style.display = 'none';
