@@ -428,7 +428,7 @@ a{color:var(--ai)}
 <!-- ===== リソース追加モーダル（管理者） ===== -->
 <div class="modal-bg" id="res-modal">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:420px">
-    <h3>リソースを追加</h3>
+    <h3 id="res-modal-title">リソースを追加</h3>
     <p class="sub" id="res-modal-room"></p>
     <label class="form-label">カテゴリ（見出し。既存と同名なら同じカードにまとまります）</label>
     <input class="form-input" id="res-cat" list="res-cat-list" placeholder="例：テンプレート・提出物">
@@ -443,6 +443,7 @@ a{color:var(--ai)}
       <input type="file" id="res-file" style="display:none">
       <button class="add-res-btn" style="margin-bottom:0" id="res-file-btn">📎 ファイルをアップロード</button>
       <span class="muted" id="res-file-status"></span>
+      <button class="res-del" id="res-file-clear" title="ファイルを外す" style="display:none">✕</button>
     </div>
     <p class="sub" style="margin-top:4px">PDF・HTML・画像など何でもOK。ファイルを付けた場合は、クリックでファイルが開きます。</p>
     <label class="form-label">アイコン（絵文字1つ・任意）</label>
@@ -1165,6 +1166,7 @@ async function renderResources(){
     ${S.toolsCache.length ? S.toolsCache.map(t => toolCardHtml(t, reviewsByTool, isEditor)).join('') : `<div class="empty">まだツールはありません</div>`}
   </div>`;
 
+  S.resCache = resData || [];
   S.resCats = [...new Set((resData || []).map(r => r.category))];
   const addBtn = isEditor ? `<button class="add-res-btn" id="add-res">＋ リソースを追加</button>` : '';
   let resSection;
@@ -1181,7 +1183,7 @@ async function renderResources(){
             <div><div class="res-name">${esc(r.title)}</div>
             ${r.subtitle ? `<div class="res-sub">${esc(r.subtitle)}</div>` : ''}
             ${r.file_url ? `<div class="res-sub">📎 ${esc(r.file_name || 'ファイル')}</div>` : ''}</div>
-            ${isEditor ? `<button class="res-del" data-del="${r.id}" title="削除">✕</button>` : ''}
+            ${isEditor ? `<button class="res-del" data-redit="${r.id}" title="編集">✏️</button><button class="res-del" data-del="${r.id}" title="削除">✕</button>` : ''}
           </a>`).join('')}
       </div>`).join('');
   }
@@ -1228,7 +1230,11 @@ async function renderResources(){
   });
 
   const ab = $('add-res');
-  if (ab) ab.onclick = openResModal;
+  if (ab) ab.onclick = () => openResModal(null);
+  $('page').querySelectorAll('[data-redit]').forEach(el => el.onclick = e => {
+    e.preventDefault(); e.stopPropagation();
+    openResModal((S.resCache || []).find(r => r.id === el.dataset.redit) || null);
+  });
   $('page').querySelectorAll('[data-del]').forEach(el => el.onclick = async e => {
     e.preventDefault(); e.stopPropagation();
     if (!confirm('このリソースを削除しますか？')) return;
@@ -1386,15 +1392,31 @@ $('vid-save').onclick = async () => {
   renderArchive();
 };
 
-function openResModal(){
-  $('res-modal-room').textContent = S.current.room.name + ' のリソースに追加されます';
+function openResModal(r){
+  S.editingRes = r || null;
+  $('res-modal-title').textContent = r ? 'リソースを編集' : 'リソースを追加';
+  $('res-save').textContent = r ? '保存する' : '追加する';
+  $('res-modal-room').textContent = S.current.room.name + (r ? ' のリソースを編集します' : ' のリソースに追加されます');
   $('res-cat-list').innerHTML = (S.resCats || []).map(c => `<option value="${esc(c)}">`).join('');
-  ['res-cat','res-title','res-sub','res-url','res-icon'].forEach(id => $(id).value = '');
-  S.resFileUrl = null; S.resFileName = null;
+  $('res-cat').value = r?.category || '';
+  $('res-title').value = r?.title || '';
+  $('res-sub').value = r?.subtitle || '';
+  $('res-url').value = r?.url || '';
+  $('res-icon').value = r?.icon || '';
+  S.resFileUrl = r?.file_url || null;
+  S.resFileName = r?.file_name || null;
   $('res-file').value = '';
-  $('res-file-status').textContent = '';
+  updateResFileStatus();
   $('res-modal').style.display = 'flex';
 }
+function updateResFileStatus(){
+  $('res-file-status').textContent = S.resFileName ? `✓ ${S.resFileName}` : '';
+  $('res-file-clear').style.display = S.resFileName ? '' : 'none';
+}
+$('res-file-clear').onclick = () => {
+  S.resFileUrl = null; S.resFileName = null;
+  updateResFileStatus();
+};
 $('res-modal').onclick = () => $('res-modal').style.display = 'none';
 $('res-file-btn').onclick = () => $('res-file').click();
 $('res-file').onchange = async () => {
@@ -1405,7 +1427,7 @@ $('res-file').onchange = async () => {
     const up = await uploadRoomFile(file, 'resources');
     S.resFileUrl = up.url;
     S.resFileName = up.name;
-    $('res-file-status').textContent = `✓ ${up.name}`;
+    updateResFileStatus();
   } catch (err) {
     $('res-file-status').textContent = '';
     return toast('アップロードに失敗しました：' + err.message);
@@ -1415,8 +1437,7 @@ $('res-file').onchange = async () => {
 $('res-save').onclick = async () => {
   const cat = $('res-cat').value.trim(), title = $('res-title').value.trim();
   if (!cat || !title) return toast('カテゴリとタイトルは必須です');
-  const { error } = await supa.from('resources').insert({
-    room_id: S.current.room.id,
+  const row = {
     category: cat,
     title,
     subtitle: $('res-sub').value.trim() || null,
@@ -1424,11 +1445,14 @@ $('res-save').onclick = async () => {
     file_url: S.resFileUrl || null,
     file_name: S.resFileName || null,
     icon: $('res-icon').value.trim() || '📄',
-    sort_order: 100,
-  });
-  if (error) return toast('追加に失敗しました：' + error.message);
+  };
+  const q = S.editingRes
+    ? supa.from('resources').update(row).eq('id', S.editingRes.id)
+    : supa.from('resources').insert({ ...row, room_id: S.current.room.id, sort_order: 100 });
+  const { error } = await q;
+  if (error) return toast('保存に失敗しました：' + error.message);
   $('res-modal').style.display = 'none';
-  toast('リソースを追加しました');
+  toast(S.editingRes ? 'リソースを更新しました' : 'リソースを追加しました');
   renderResources();
 };
 
