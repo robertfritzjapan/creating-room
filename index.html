@@ -96,6 +96,7 @@ a{color:var(--ai)}
 .video-open-link{display:none;margin-top:10px;font-size:12.5px}
 .video-row.open .video-open-link{display:inline-block;background:var(--ai);color:#fff;padding:7px 18px;border-radius:6px;text-decoration:none;font-weight:500}
 .thumb{width:64px;height:42px;border-radius:6px;flex-shrink:0;background:linear-gradient(135deg,#141414 0%,#4a4a4e 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px}
+.thumb-note{background:var(--washi);border:1px solid var(--line);font-size:17px}
 .video-info{flex:1;min-width:0}
 .video-title{font-weight:600;font-size:13.5px}
 .video-sub{font-size:11.5px;color:var(--gray);margin-top:2px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
@@ -940,14 +941,16 @@ function drawArchive(){
   const editor = canEdit(S.current.room.id);
   const list = S.videos.filter(v =>
     (S.videoFilter === 'すべて' || v.class_type === S.videoFilter) &&
-    (!q || (v.title + ' ' + (v.description||'') + ' ' + (v.assignment||'')).toLowerCase().includes(q)));
+    (!q || (v.title + ' ' + (v.description||'') + ' ' + (v.assignment||'')).toLowerCase().includes(q)))
+    .sort((a, b) => (b.session_date || '').localeCompare(a.session_date || '')
+      || (a.created_at || '').localeCompare(b.created_at || ''));
   $('page').innerHTML = `
     ${editor ? `<button class="add-res-btn" id="add-vid">＋ クラス回を追加</button>` : ''}
     <div class="filters">${types.map(t => `<div class="chip ${t===S.videoFilter?'on':''}" data-f="${esc(t)}">${esc(t)}</div>`).join('')}</div>
     <input class="search-box" id="v-search" placeholder="🔍 概要・アサインメントで検索…" value="${esc(S.videoSearch)}">
     ${list.length ? list.map(v => `
       <div class="video-row" data-vrow="${v.id}">
-        ${v.vimeo_url ? `<a class="thumb" href="${esc(v.vimeo_url)}" target="_blank" rel="noopener" title="動画を開く">▶</a>` : `<div class="thumb">▶</div>`}
+        ${v.vimeo_url ? `<a class="thumb" href="${esc(v.vimeo_url)}" target="_blank" rel="noopener" title="動画を開く">▶</a>` : `<div class="thumb thumb-note">📝</div>`}
         <div class="video-info">
           <div class="video-title">${esc(v.title)}</div>
           <div class="video-sub">${fmtMonth(v.session_date)}${v.description ? ' ・ ' + esc(v.description) : ''}</div>
