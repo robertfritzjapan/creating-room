@@ -299,7 +299,11 @@ a{color:var(--ai)}
       <input type="email" id="magic-email" placeholder="メールアドレス" autocomplete="email">
       <button id="magic-btn">送信</button>
     </div>
-    <div id="magic-sent">ログイン用のリンクをメールに送りました。メールを開いてリンクをタップしてください。</div>
+    <div id="magic-sent">メールを送りました。届いたメールの<b>6桁のコード</b>を下に入力してください（メール内のリンクをタップしてもログインできます）。</div>
+    <div class="email-row" id="otp-row" style="display:none;margin-top:10px">
+      <input inputmode="numeric" pattern="[0-9]*" maxlength="6" id="otp-code" placeholder="6桁のコード" autocomplete="one-time-code">
+      <button id="otp-btn">ログイン</button>
+    </div>
     <p class="login-note">メールの方はパスワード不要。届いたリンクをタップするだけでログインできます。<br>Facebookアカウントは不要です。</p>
   </div>
 </div>
@@ -536,6 +540,18 @@ $('magic-btn').onclick = async () => {
   $('magic-btn').disabled = false;
   if (error) return toast('送信に失敗しました：' + error.message);
   $('magic-sent').style.display = 'block';
+  $('otp-row').style.display = 'flex';
+  $('otp-code').focus();
+};
+$('otp-btn').onclick = async () => {
+  const email = $('magic-email').value.trim();
+  const code = $('otp-code').value.trim();
+  if (!code) return toast('メールに届いた6桁のコードを入力してください');
+  $('otp-btn').disabled = true;
+  const { error } = await supa.auth.verifyOtp({ email, token: code, type: 'email' });
+  $('otp-btn').disabled = false;
+  if (error) return toast('コードが正しくないか、期限切れです。もう一度「送信」からやり直してください。');
+  // 成功すると onAuthStateChange が発火してアプリ画面に切り替わる
 };
 $('logout-btn').onclick = async () => { await supa.auth.signOut(); location.reload(); };
 
