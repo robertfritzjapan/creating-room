@@ -1129,7 +1129,7 @@ function toolCardHtml(t, reviewsByTool, isEditor){
         <div class="tool-name">${esc(t.name)}</div>
         <div class="tool-by">${esc(authorName)}が追加</div>
       </div>
-      ${isEditor ? `<span class="tool-actions"><button class="res-del" data-tedit="${t.id}" title="編集">✏️</button><button class="res-del" data-tdel="${t.id}" title="削除">✕</button></span>` : ''}
+      ${(isEditor || t.created_by === S.user.id) ? `<span class="tool-actions"><button class="res-del" data-tedit="${t.id}" title="編集">✏️</button><button class="res-del" data-tdel="${t.id}" title="削除">✕</button></span>` : ''}
     </div>
     ${t.description ? `<div class="tool-desc">${esc(t.description)}</div>` : ''}
     ${t.content ? `<div class="tool-text"><button class="copy-btn" data-copy="${t.id}">📋 コピー</button><pre>${esc(t.content)}</pre></div>` : ''}
@@ -1173,9 +1173,9 @@ async function renderResources(){
 
   const isEditor = canEdit(roomId);
   S.toolsCache = toolData || [];
-  const toolAddBtn = isEditor ? `<button class="add-res-btn" id="add-tool">＋ ツールを追加</button>` : '';
+  const toolAddBtn = `<button class="add-res-btn" id="add-tool">＋ ツールを追加</button>`;
   const toolSection = `<div class="card tool-section"><h3><span class="bar"></span>🛠 みんなのツール<span class="tool-badge">投稿大歓迎</span></h3>
-    <p class="tool-note">ここはメンバーのみなさんが参加できるコーナーです。ツールを使った感想（使い手の声）を自由に投稿してください。</p>
+    <p class="tool-note">ここはメンバーのみなさんが参加できるコーナーです。ツールの登録も、使ってみた感想（使い手の声）の投稿も、自由にどうぞ。</p>
     ${toolAddBtn}
     ${S.toolsCache.length ? S.toolsCache.map(t => toolCardHtml(t, reviewsByTool, isEditor)).join('') : `<div class="empty">まだツールはありません</div>`}
   </div>`;
