@@ -9,7 +9,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&family=Lora:wght@400;700&display=swap" rel="stylesheet">
 <style>
 :root{
   --ai:#a6262c; --ai-deep:#141414; --ai-soft:#f5e7e7;
@@ -30,7 +30,8 @@ a{color:var(--ai)}
   width:230px;flex-shrink:0;background:var(--ai-deep);color:#c9c9cc;
   padding:28px 0 18px;display:flex;flex-direction:column;
 }
-.logo{padding:0 24px 26px;font-family:'Shippori Mincho',serif;color:#fff;font-size:17px;font-weight:600;letter-spacing:.06em}
+.logo{padding:0 24px 26px;font-family:'Lora',serif;color:#fff;font-size:17px;font-weight:400;letter-spacing:.01em}
+.logo b{font-weight:700}
 .logo small{display:block;font-family:'Noto Sans JP';font-size:10px;color:#8f8f96;letter-spacing:.18em;margin-top:3px}
 .nav-label{font-size:10px;letter-spacing:.2em;padding:14px 24px 6px;color:#77777d}
 .nav-item{
@@ -227,7 +228,8 @@ a{color:var(--ai)}
   overflow-y:auto;padding:24px 0;
 }
 .login-card{background:var(--white);border-radius:14px;padding:36px 34px;text-align:center;max-width:400px;width:92%;margin:auto}
-.login-card h2{font-family:'Shippori Mincho',serif;font-size:20px;margin-bottom:6px;letter-spacing:.04em}
+.login-card h2{font-family:'Lora',serif;font-size:20px;margin-bottom:6px;letter-spacing:.01em;font-weight:400}
+.login-card h2 b{font-weight:700}
 .login-card .sub{color:var(--gray);font-size:12.5px;margin-bottom:24px}
 .gbtn{
   display:flex;align-items:center;justify-content:center;gap:10px;width:100%;
@@ -262,7 +264,8 @@ a{color:var(--ai)}
 
 /* ===== Toast / spinner ===== */
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ai-deep);color:#fff;padding:10px 22px;border-radius:22px;font-size:12.5px;z-index:200;display:none;max-width:90%}
-#boot{position:fixed;inset:0;background:var(--washi);z-index:40;display:flex;align-items:center;justify-content:center;color:var(--gray);font-size:13px;letter-spacing:.1em}
+#boot{position:fixed;inset:0;background:var(--washi);z-index:40;display:flex;align-items:center;justify-content:center;color:var(--gray);font-size:13px;letter-spacing:.05em;font-family:'Lora',serif}
+#boot b{font-weight:700}
 
 /* ===== Mobile ===== */
 .sidebar-bg{display:none;position:fixed;inset:0;background:rgba(20,20,20,.4);z-index:29}
@@ -283,12 +286,12 @@ a{color:var(--ai)}
 </head>
 <body>
 
-<div id="boot">Creating Room …</div>
+<div id="boot"><b>Creating</b> Room …</div>
 
 <!-- ===== ログイン ===== -->
 <div id="login">
   <div class="login-card">
-    <h2>Creating Room</h2>
+    <h2><b>Creating</b> Room</h2>
     <p class="sub">Creatingスクエアから、それぞれの部屋へ。</p>
     <button class="gbtn" id="google-btn">
       <svg width="17" height="17" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.8 6.1C12.3 13.4 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/><path fill="#FBBC05" d="M10.4 28.7c-.5-1.5-.8-3-.8-4.7s.3-3.2.8-4.7l-7.8-6.1C.9 16.5 0 20.1 0 24s.9 7.5 2.6 10.8l7.8-6.1z"/><path fill="#34A853" d="M24 48c6.2 0 11.6-2 15.4-3.6 0 0-7.5-5.8-7.5-5.8-2.1 1.4-4.8 2.3-7.9 2.3-6.3 0-11.7-3.9-13.6-9.3l-7.8 6.1C6.5 42.6 14.6 48 24 48z"/></svg>
@@ -312,7 +315,7 @@ a{color:var(--ai)}
 <div class="app" id="app" style="display:none">
   <div class="sidebar-bg" id="sidebar-bg"></div>
   <aside class="sidebar" id="sidebar">
-    <div class="logo">Creating Room<small>ROBERT FRITZ CONSULTING</small></div>
+    <div class="logo"><b>Creating</b> Room<small>ROBERT FRITZ CONSULTING</small></div>
     <div id="nav"></div>
     <div class="logout" id="logout-btn">ログアウト</div>
     <div class="me" id="me-btn">
