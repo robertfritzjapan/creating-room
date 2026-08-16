@@ -43,7 +43,7 @@ a{color:var(--ai)}
 .nav-item.active{background:rgba(255,255,255,.09);border-left-color:var(--ai);color:#fff}
 .nav-item .dot{width:7px;height:7px;border-radius:50%;background:#5d7393;flex-shrink:0}
 .nav-item.active .dot{background:#fff}
-.nav-item.locked{opacity:.45;cursor:default}
+.nav-item.locked{opacity:.6;cursor:pointer}
 .nav-item .join-mini{margin-left:auto;font-size:10px;background:var(--ai);color:#fff;border:none;border-radius:10px;padding:2px 10px;cursor:pointer}
 .me{
   margin-top:auto;padding:18px 24px 0;border-top:1px solid rgba(255,255,255,.1);
@@ -641,7 +641,7 @@ function renderNav(){
   }
   if (locked.length) {
     h += `<div class="nav-label">その他のプログラム</div>` + locked.map(r =>
-      `<div class="nav-item locked">🔒 ${esc(r.name)}</div>`).join('');
+      `<div class="nav-item locked" data-nav="${r.id}">🔒 ${esc(r.name)}</div>`).join('');
   }
   $('nav').innerHTML = h;
   $('nav').querySelectorAll('[data-nav]').forEach(el => el.onclick = () => {
@@ -693,6 +693,8 @@ $('pin-btn').onclick = async () => {
 
 function openRoom(room){
   if (!room) return openHome();
+  if (!isMember(room.id)) return openRoomAbout(room);
+  if (room.slug === 'lessons21') return openLessonsRoom(room);
   leaveChat();
   S.current = { type:'room', room };
   $('room-title').textContent = room.name;
@@ -704,6 +706,70 @@ function openRoom(room){
   $('tabs').querySelectorAll('.tab').forEach(el => el.onclick = () => showTab(el.dataset.tab));
   highlightNav();
   showTab('pinned');
+}
+
+/* ===== 紹介ページ（未所属の部屋。visibility を問わず全員がここに来る） ===== */
+async function openRoomAbout(room){
+  leaveChat();
+  S.current = { type:'room-about', room };
+  $('room-title').textContent = room.name;
+  $('tabs').innerHTML = '';
+  updatePinBtn();
+  highlightNav();
+  $('page').innerHTML = `<div class="empty">読み込み中…</div>`;
+  const { data: cohorts, error } = await supa.from('cohorts').select('*')
+    .eq('room_id', room.id).eq('status', 'open').order('sort_order');
+  if (S.current.room !== room) return;   // 読み込み中に画面が変わったら破棄
+  if (error) { $('page').innerHTML = `<div class="empty">読み込みに失敗しました<br><span style="font-size:11px;color:#999">${esc(error.code || '')} ${esc(error.message || '')}</span></div>`; return; }
+  let h = `<div class="card">
+    <h3><span class="bar"></span>${esc(room.name)}</h3>
+    ${room.subtitle ? `<p class="muted" style="margin:-4px 0 14px">${esc(room.subtitle)}</p>` : ''}
+    ${room.about_what ? `<div class="kv"><b>ここで何をするか</b><span>${richText(room.about_what)}</span></div>` : ''}
+    ${room.about_who  ? `<div class="kv"><b>誰が入っているか</b><span>${richText(room.about_who)}</span></div>`  : ''}
+    ${room.about_how  ? `<div class="kv"><b>入り方</b><span>${richText(room.about_how)}</span></div>`  : ''}
+  </div>`;
+  if ((cohorts || []).length) {
+    h += cohorts.map(c => `
+      <div class="card">
+        <h3><span class="bar"></span>${esc(c.name)}${c.period_label ? `<span class="muted" style="margin-left:8px;font-weight:400">${esc(c.period_label)}</span>` : ''}</h3>
+        ${c.price_jpy != null ? `<div class="kv"><b>参加費</b>¥${Number(c.price_jpy).toLocaleString('ja-JP')}</div>` : ''}
+        ${c.payment_info ? `<div class="kv"><b>お支払い</b><span>${richText(c.payment_info)}</span></div>` : ''}
+        <button class="primary-btn" style="margin-top:10px" data-cohort-join="${c.id}">参加する</button>
+      </div>`).join('');
+  } else {
+    h += `<div class="card"><p style="font-size:13px">${esc(room.next_intake || 'いまは募集していません')}</p></div>`;
+  }
+  $('page').innerHTML = h;
+  $('page').querySelectorAll('[data-cohort-join]').forEach(el => el.onclick = () => joinCohort(el.dataset.cohortJoin, room));
+}
+async function joinCohort(cohortId, room){
+  const { error } = await supa.from('cohort_members').insert({ cohort_id: cohortId, user_id: S.user.id });
+  if (error) return toast('参加に失敗しました：' + error.message);
+  const { data } = await supa.from('memberships').select('*').eq('user_id', S.user.id);
+  S.memberships = data || S.memberships;
+  renderNav(); renderMe();
+  toast('参加しました。お支払いのご案内をご確認ください');
+  openRoom(room);
+}
+
+/* ===== 21 Lessons（仮の中身。シリーズ→Day→本文は次のフェーズで作る） ===== */
+async function openLessonsRoom(room){
+  leaveChat();
+  S.current = { type:'room', room };
+  $('room-title').textContent = room.name;
+  updatePinBtn();
+  $('tabs').innerHTML = '';
+  highlightNav();
+  $('page').innerHTML = `<div class="empty">読み込み中…</div>`;
+  const { data, error } = await supa.from('cohort_members').select('*, cohorts(*)').eq('user_id', S.user.id);
+  if (S.current.room !== room) return;
+  if (error) { $('page').innerHTML = `<div class="empty">読み込みに失敗しました<br><span style="font-size:11px;color:#999">${esc(error.code || '')} ${esc(error.message || '')}</span></div>`; return; }
+  const mine = (data || []).filter(m => m.cohorts && m.cohorts.room_id === room.id);
+  $('page').innerHTML = mine.length ? mine.map(m => `
+    <div class="card">
+      <h3><span class="bar"></span>${esc(m.cohorts.name)}</h3>
+      <p class="muted" style="margin-top:10px">Day一覧・コメントは準備中です。もうしばらくお待ちください。</p>
+    </div>`).join('') : `<div class="empty">まだ参加している回はありません</div>`;
 }
 function showTab(tab){
   if (S.tab === 'chat' && tab !== 'chat') leaveChat();
