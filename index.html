@@ -965,7 +965,7 @@ async function renderPinned(){
     </div>`);
   }
   if (half.length) h += `<div class="info-grid">${half.join('')}</div>`;
-  if (!sgErr && (sgs.length || editor)) {
+  if (!sgErr && (sgs.length || editor) && room.slug !== 'entrance') {   // はじめかた本体には出さない（Creatingノートのタブ側にある）
     h += `<div class="card sg-card"><h3><span class="bar"></span>🙋 参加希望の受付${editor ? `<span style="margin-left:auto"><button class="res-del" id="add-signup" title="受付を追加">＋ 追加</button></span>` : ''}</h3>
       ${sgs.length ? sgs.map(s => {
         const rs = sgResp.filter(r => r.signup_id === s.id);
@@ -1376,7 +1376,7 @@ async function renderResources(){
   const isEditor = canEdit(roomId);
   S.toolsCache = toolData || [];
   const toolAddBtn = `<button class="add-res-btn" id="add-tool">＋ ツールを追加</button>`;
-  const noTools = S.current.room.slug === 'entrance' || S.current.room.kind === 'tool';
+  const noTools = S.current.room.slug === 'entrance' || S.current.room.kind === 'tool' || navGroupOf(S.current.room) === 'continue';   // はじめかた・道具・つくり続けるには「みんなのツール」を出さない
   const toolSection = noTools ? '' : `<div class="card tool-section"><h3><span class="bar"></span>🛠 みんなのツール<span class="tool-badge">投稿大歓迎</span></h3>
     <p class="tool-note">ここはメンバーのみなさんが参加できるコーナーです。ツールの登録も、使ってみた感想（使い手の声）の投稿も、自由にどうぞ。</p>
     ${toolAddBtn}
