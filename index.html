@@ -869,7 +869,7 @@ function openRoom(room){
   const tabs = room.slug === 'entrance'
     ? [['pinned','固定情報'],['resources','リソース']]
     : [['pinned','固定情報'],['archive','クラス記録'],['chat','質問'],['resources','リソース']];
-  if (roleIn(room.id) === 'admin' && room.slug !== 'entrance') tabs.push(['members','メンバー']);
+  if (roleIn(room.id) === 'admin') tabs.push(['members','メンバー']);   // 管理者だけ。はじめかたでは「誰がここまで来ているか」の一覧になる
   $('tabs').innerHTML = tabs.map(([k,label]) =>
     `<div class="tab" data-tab="${k}">${label}</div>`).join('');
   $('tabs').querySelectorAll('.tab').forEach(el => el.onclick = () => showTab(el.dataset.tab));
