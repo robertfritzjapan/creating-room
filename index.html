@@ -267,6 +267,111 @@ a{color:var(--ai)}
 #boot{position:fixed;inset:0;background:var(--washi);z-index:40;display:flex;align-items:center;justify-content:center;color:var(--gray);font-size:13px;letter-spacing:.03em;line-height:1.4;font-family:'Lora',serif}
 #boot b{font-weight:700}
 
+/* ===== ホーム（あいさつ・現在地） ===== */
+.greet{margin:4px 0 22px}
+.greet .g1{font-family:'Shippori Mincho',serif;font-size:23px;font-weight:600;letter-spacing:.02em;line-height:1.4}
+.greet .g2{font-size:13.5px;color:#4d4d52;margin-top:6px}
+.greet .g2 a{color:inherit;text-decoration:none;border-bottom:1px solid var(--line)}
+.greet .g2 a:hover{color:var(--ai);border-color:var(--ai)}
+.feed-click{cursor:pointer}
+.feed-click:hover{background:#fbfbfa}
+.nav-item.locked{opacity:.5}
+.nav-item .nav-badge{margin-left:auto;font-size:9.5px;background:var(--ai);color:#fff;border-radius:3px;padding:0 5px;font-weight:700}
+.nav-item .nav-tag{margin-left:auto;font-size:9px;background:var(--ai);color:#fff;border-radius:3px;padding:0 5px;font-weight:700;letter-spacing:.04em}
+.nav-item .nav-sub{display:block;font-size:10px;color:#77777d;line-height:1.4}
+.nav-item .nav-name{line-height:1.45}
+
+/* ===== 紹介ページ ===== */
+.about-title{font-family:'Shippori Mincho',serif;font-size:22px;font-weight:600;margin-bottom:2px}
+.about-sub{color:var(--gray);font-size:13px;margin-bottom:18px}
+.about-kv{border-top:1px solid var(--line);padding:14px 0}
+.about-kv .k{font-size:10.5px;color:var(--ai);font-weight:700;letter-spacing:.05em;margin-bottom:3px}
+.about-kv .v{font-size:13.5px;line-height:1.85}
+.nocta{border:1px dashed #d8d4d0;border-radius:7px;padding:14px;text-align:center;font-size:12.5px;color:var(--gray)}
+.ghost-btn{margin-top:10px;background:none;border:1px solid #d8d4d0;border-radius:20px;padding:6px 16px;font-size:12px;color:#6d6a67;cursor:pointer}
+.ghost-btn:hover,.ghost-btn.on{border-color:var(--ai);color:var(--ai)}
+.pill-open{display:inline-block;background:var(--ai);color:#fff;border-radius:5px;padding:1px 9px;font-size:10.5px;font-weight:700}
+.pill-g{display:inline-block;background:#f0eeec;color:#7c7874;border-radius:5px;padding:1px 9px;font-size:10.5px;font-weight:700}
+
+/* ===== 21 Lessons：一覧 ===== */
+.lrow{display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.lrow:last-child{border-bottom:none}
+.lrow:hover{background:#fcfbfa}
+.lrow.dim{opacity:.55;cursor:default}
+.lrow.dim:hover{background:none}
+.lico{width:44px;height:44px;flex:0 0 44px;border-radius:10px;background:var(--ai-soft);display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--ai);font-weight:700}
+.lico.plain{background:#f4f2f0;color:#8a8683}
+.lmain{flex:1;min-width:0}
+.lt1{font-size:14px;font-weight:600;line-height:1.5}
+.lt2{font-size:12px;color:var(--gray);margin-top:1px;line-height:1.55}
+.lright{font-size:11.5px;color:var(--gray);white-space:nowrap;text-align:right;display:flex;align-items:center;gap:4px}
+.prog{height:4px;background:#eeecea;border-radius:2px;margin:-4px 0 10px;overflow:hidden}
+.prog i{display:block;height:100%;background:var(--ai)}
+
+/* ===== 21 Lessons：本文 ===== */
+.lesson-img{display:block;width:100%;border-radius:10px;margin-bottom:20px}
+.ltitle{font-family:'Shippori Mincho',serif;font-size:22px;font-weight:600;line-height:1.45}
+.lmeta{font-size:11.5px;color:var(--gray);margin:6px 0 18px}
+.ltext{font-size:14.5px;line-height:2}
+.acts{display:flex;gap:10px;margin-top:22px;border-top:1px solid var(--line);padding-top:16px}
+.act{border:1px solid #e2dfdb;background:#fff;border-radius:22px;padding:7px 16px;font-size:12.5px;cursor:pointer}
+.act:hover{border-color:#b3aea8}
+.act.on{border-color:var(--ai);color:var(--ai);background:var(--ai-soft);font-weight:700}
+.likenames{font-size:11.5px;color:var(--gray);margin-top:10px}
+.cm{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}
+.cm:last-of-type{border-bottom:none}
+.cav{width:34px;height:34px;flex:0 0 34px;background:#e9e6e3;color:#6d6a67;font-size:12.5px}
+.cav.cav-ed{background:linear-gradient(135deg,#a6262c,#c9494f);color:#fff}
+.cwho{font-size:12.5px;font-weight:600}
+.cwho span{font-weight:400;color:var(--gray);margin-left:8px;font-size:10.5px}
+.cwho .cwho-ed{background:var(--ai);color:#fff;font-size:9.5px;border-radius:3px;padding:0 5px;margin-left:6px;font-weight:700}
+.ctext{font-size:13.5px;line-height:1.85;margin-top:3px;word-break:break-word}
+.ctext.cdel{color:var(--gray);font-style:italic}
+.ctools{display:flex;gap:14px;margin-top:6px;font-size:11px;color:var(--gray);flex-wrap:wrap}
+.ctools button{background:none;border:none;padding:0;font-size:11px;color:var(--gray);cursor:pointer}
+.ctools button:hover{color:var(--ai)}
+.ctools button.on{color:var(--ai);font-weight:700}
+.rep{margin-top:12px;background:#faf8f7;border-left:3px solid #d8d4d0;border-radius:0 8px 8px 0;padding:11px 14px}
+.rep.rep-ed{border-left-color:var(--ai)}
+.unans{margin-top:10px;font-size:11.5px;color:var(--ai);font-weight:700}
+.composer{display:flex;gap:10px;align-items:flex-end;margin-top:16px;border-top:1px solid var(--line);padding-top:16px}
+.cinput{flex:1;border:1px solid #e2dfdb;border-radius:18px;padding:9px 16px;font-size:16px;font-family:inherit;outline:none;resize:none;line-height:1.5;background:var(--white)}
+.cinput:focus{border-color:var(--ai)}
+
+/* ===== 入稿（iPhone 前提） ===== */
+.postbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;background:var(--ai-deep);color:#fff;border-radius:10px;padding:10px 14px;margin-bottom:14px}
+.postbar-t{font-family:'Lora',serif;font-weight:700;font-size:15px;white-space:nowrap}
+.postbar-saved{flex:1;font-size:11px;color:#9b9895;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.postbar-go{background:var(--ai);color:#fff;border:none;border-radius:20px;padding:8px 20px;font-size:14px;font-weight:700;cursor:pointer}
+.postbar-go:disabled{background:#3a3735;color:#7d7a78}
+.postcard{padding:18px 18px 22px}
+.ctx{background:var(--ai-soft);color:var(--ai);border-radius:8px;padding:9px 12px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;margin-bottom:16px}
+.ctx span{flex:1}
+.ctx-sel{font:inherit;font-size:13px;border:1px solid #e2c9ca;border-radius:6px;padding:4px 6px;background:#fff;color:var(--ai);max-width:46%}
+.ctx-day{width:58px;font:inherit;font-size:16px;border:1px solid #e2c9ca;border-radius:6px;padding:4px 6px;text-align:center;background:#fff;color:var(--ai)}
+.plabel{display:block;font-size:11.5px;color:var(--ai);font-weight:700;letter-spacing:.05em;margin:18px 0 6px}
+.pinput{width:100%;border:1px solid var(--line);border-radius:9px;padding:12px 14px;font-size:16px;font-family:inherit;outline:none;line-height:1.85;background:#fff}
+.pinput:focus{border-color:var(--ai)}
+.ptext{resize:none;min-height:180px;overflow:hidden}
+.phint{display:block;font-size:11.5px;color:var(--gray);margin-top:6px;line-height:1.6}
+.ppick{display:flex;gap:10px}
+.ppick button{flex:1;border:1px dashed #d3cfcb;border-radius:9px;padding:16px 10px;font-size:14px;color:#57534f;text-align:center;background:#fff;cursor:pointer;font-family:inherit}
+.ppick button span{display:block;font-size:20px;margin-bottom:4px}
+.ppick button:active{border-color:var(--ai);color:var(--ai)}
+.pthumb{position:relative;border-radius:9px;overflow:hidden;border:1px solid var(--line)}
+.pthumb img{display:block;width:100%}
+.prm{position:absolute;top:8px;right:8px;background:rgba(20,18,17,.72);color:#fff;border:none;border-radius:16px;padding:5px 12px;font-size:12px;cursor:pointer}
+.pseg{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.pseg button{flex:1;padding:11px 6px;font-size:13.5px;background:#fff;color:#57534f;border:none;cursor:pointer;font-family:inherit}
+.pseg button.on{background:var(--ai);color:#fff;font-weight:700}
+.pbig{width:100%;background:var(--ai);color:#fff;border:none;border-radius:10px;padding:16px;font-size:16px;font-weight:700;margin-top:20px;cursor:pointer}
+.pbig:disabled{background:#ddd9d5;color:#a8a4a0}
+.done{text-align:center;padding:40px 22px}
+.done .mk{width:56px;height:56px;border-radius:50%;background:var(--ai);color:#fff;font-size:26px;line-height:56px;margin:0 auto 16px}
+.done h2{font-family:'Shippori Mincho',serif;font-size:21px;margin:0 0 6px;font-weight:600}
+.done p{font-size:13.5px;color:var(--gray);margin:0 0 22px;line-height:1.85}
+.done .sub{border:1px solid var(--line);border-radius:10px;padding:14px;text-align:left;font-size:13px;color:#57534f;line-height:1.8}
+
 /* ===== Mobile ===== */
 .sidebar-bg{display:none;position:fixed;inset:0;background:rgba(20,20,20,.4);z-index:29}
 @media(max-width:760px){
@@ -491,16 +596,51 @@ a{color:var(--ai)}
 <!-- ===== 名前設定モーダル ===== -->
 <div class="modal-bg" id="name-modal">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:380px">
-    <h3>表示名の設定</h3>
-    <p class="sub">チャットなどで表示される名前です。</p>
-    <input class="name-input" id="name-input" placeholder="例：森山千賀子" maxlength="40">
+    <h3>なんとお呼びしましょう</h3>
+    <p class="sub">あいさつやコメントに出る名前です。あとから左下の名前を押して変えられます。</p>
+    <input class="name-input" id="name-input" placeholder="例：千賀子" maxlength="40">
     <button class="primary-btn" id="name-save">保存</button>
+  </div>
+</div>
+
+<!-- ===== 期の作成・編集モーダル（21 Lessons・編集者以上） ===== -->
+<div class="modal-bg" id="cohort-modal">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:460px">
+    <h3 id="ch-modal-title">期を作る</h3>
+    <p class="sub">「MMOT 21」のような、ひとつのシリーズです。draft のあいだは参加者に見えません。</p>
+    <label class="form-label">名前</label>
+    <input class="form-input" id="ch-name" placeholder="例：MMOT 21">
+    <label class="form-label">時期のラベル（任意）</label>
+    <input class="form-input" id="ch-period" placeholder="例：2026年9月">
+    <div style="display:flex;gap:10px">
+      <div style="flex:1"><label class="form-label">開始日</label><input class="form-input" id="ch-starts" type="date"></div>
+      <div style="width:100px"><label class="form-label">回数</label><input class="form-input" id="ch-total" type="number" value="21"></div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <div style="flex:1"><label class="form-label">募集開始</label><input class="form-input" id="ch-from" type="date"></div>
+      <div style="flex:1"><label class="form-label">募集終了</label><input class="form-input" id="ch-to" type="date"></div>
+    </div>
+    <label class="form-label">参加費（円・任意）</label>
+    <input class="form-input" id="ch-price" type="number" placeholder="例：2000">
+    <label class="form-label">お支払いの案内（PayPay・振込先など。任意）</label>
+    <textarea class="form-input" id="ch-payinfo" rows="3" placeholder="例：PayPay（ID：xxxx）または お振込。確認でき次第、読めるようになります。"></textarea>
+    <label class="form-label">決済リンク（Stripe など。任意）</label>
+    <input class="form-input" id="ch-payurl" placeholder="https://…">
+    <label class="form-label">状態</label>
+    <select class="form-input" id="ch-status">
+      <option value="draft">draft ── 準備中（参加者に見えない）</option>
+      <option value="open">open ── 募集中（申込ボタンが出る）</option>
+      <option value="active">active ── 開講中</option>
+      <option value="past">past ── 終了（買った人は読み返せる）</option>
+    </select>
+    <div style="margin-top:20px"><button class="primary-btn" id="ch-save">保存する</button></div>
   </div>
 </div>
 
 <div id="toast"></div>
 
 <script src="vendor/supabase.js"></script>
+<script src="lessons.js?v=1"></script>
 <script>
 /* ================= 設定 ================= */
 if (!window.supabase) { document.getElementById('boot').textContent = '読み込みに失敗しました。再読み込みしてください。'; throw new Error('supabase-js not loaded'); }
@@ -585,6 +725,8 @@ async function start(){
     S.rooms = r.data || [];
     S.memberships = m.data || [];
     S.profilesCache[uid] = S.profile.display_name;
+    S.firstVisit = !S.profile.display_name || S.profile.display_name.includes('@');
+    await lessonsBootstrap();   // 21 Lessons：期と自分の参加を読む（lessons.js）
     renderMe(); renderNav();
     const defRoom = S.rooms.find(x => x.id === S.profile.default_room && isMember(x.id));
     const sccp = S.rooms.find(x => x.slug === 'sccp');
@@ -592,7 +734,7 @@ async function start(){
     else if (sccp && isMember(sccp.id)) openRoom(sccp);
     else if (S.memberships.length) openRoom(S.rooms.find(x => isMember(x.id)));  // sort_order順で最初の所属ルーム（＝玄関）
     else openHome();
-    if (!S.profile.display_name || S.profile.display_name.includes('@')) openNameModal();
+    if (S.firstVisit) openNameModal();
   } catch (e) {
     console.error(e);
     toast('データの読み込みに失敗しました。ページを再読み込みしてください。');
@@ -625,35 +767,48 @@ function renderMe(){
     : S.memberships.some(m => m.role === 'editor') ? '編集者' : 'メンバー';
   $('me-sub').textContent = top + ' ・ 権限を見る';
 }
+/* サイドバーは「みんなとつくる／つくり続ける／ひとりでつくる」の3グループ。
+   入れない部屋もグレーで見せる（押すと紹介ページ）。募集中の期がある部屋にはバッジ。 */
+const NAV_GROUPS = [['together','みんなとつくる'],['continue','つくり続ける'],['solo','ひとりでつくる']];
+const navGroupOf = r => r.nav_group || (r.kind === 'tool' ? 'solo' : 'together');
 function renderNav(){
-  const mine   = S.rooms.filter(r => isMember(r.id));
-  const publicR= S.rooms.filter(r => !isMember(r.id) && r.visibility === 'public');
-  const locked = S.rooms.filter(r => !isMember(r.id) && r.visibility !== 'public');
+  const entrance = S.rooms.find(r => r.slug === 'entrance' && isMember(r.id));
+  const lessonsEditor = S.rooms.some(r => isLessonsRoom(r) && canEdit(r.id));
   let h = `<div class="nav-label">ホーム</div>
     <div class="nav-item" data-nav="home"><span class="dot"></span>新着フィード</div>`;
-  if (mine.length) {
-    h += `<div class="nav-label">所属ルーム</div>` + mine.map(r =>
-      `<div class="nav-item" data-nav="${r.id}">${r.slug === 'entrance' ? '' : '<span class="dot"></span>'}${esc(r.name)}</div>`).join('');
+  if (entrance) h += `<div class="nav-item" data-nav="${entrance.id}"><span class="dot"></span>${esc(entrance.name)}</div>`;
+  h += `<div class="nav-item" data-nav="pins"><span class="dot"></span>ピンした場所</div>`;
+  if (lessonsEditor) {
+    h += `<div class="nav-item" data-nav="queue"><span class="dot"></span>未返信<span class="nav-badge" style="${L.queueCount ? '' : 'display:none'}">${L.queueCount || ''}</span></div>
+      <div class="nav-item" data-nav="post"><span class="dot"></span>レッスンを出す</div>`;
   }
-  if (publicR.length) {
-    h += `<div class="nav-label">参加できるルーム</div>` + publicR.map(r =>
-      `<div class="nav-item" data-join="${r.id}"><span class="dot"></span>${esc(r.name)}<button class="join-mini">参加</button></div>`).join('');
-  }
-  if (locked.length) {
-    h += `<div class="nav-label">その他のプログラム</div>` + locked.map(r =>
-      `<div class="nav-item locked" data-nav="${r.id}">🔒 ${esc(r.name)}</div>`).join('');
-  }
+  NAV_GROUPS.forEach(([key, label]) => {
+    const rooms = S.rooms.filter(r => r.slug !== 'entrance' && navGroupOf(r) === key);
+    if (!rooms.length) return;
+    h += `<div class="nav-label">${label}</div>` + rooms.map(r => {
+      const member = isMember(r.id);
+      const open = !member && L.cohorts.some(c => c.room_id === r.id && c.status === 'open');
+      const badge = open ? `<span class="nav-tag">募集中</span>`
+        : (!member && r.visibility === 'public') ? `<button class="join-mini" data-join="${r.id}">参加</button>` : '';
+      return `<div class="nav-item ${member ? '' : 'locked'}" data-nav="${r.id}"><span class="dot"></span><span class="nav-name">${esc(r.name)}${r.subtitle && !member ? `<span class="nav-sub">${esc(r.subtitle)}</span>` : ''}</span>${badge}</div>`;
+    }).join('');
+  });
   $('nav').innerHTML = h;
   $('nav').querySelectorAll('[data-nav]').forEach(el => el.onclick = () => {
     closeSidebar();
-    if (el.dataset.nav === 'home') openHome();
-    else openRoom(S.rooms.find(r => r.id === el.dataset.nav));
+    const k = el.dataset.nav;
+    if (k === 'home') openHome();
+    else if (k === 'pins') openPinsPage();
+    else if (k === 'queue') openQueuePage();
+    else if (k === 'post') openPostPage();
+    else openRoom(S.rooms.find(r => r.id === k));
   });
-  $('nav').querySelectorAll('[data-join]').forEach(el => el.onclick = () => joinPublicRoom(el.dataset.join));
+  $('nav').querySelectorAll('[data-join]').forEach(el => el.onclick = e => { e.stopPropagation(); joinPublicRoom(el.dataset.join); });
   highlightNav();
 }
 function highlightNav(){
-  const key = S.current?.type === 'home' ? 'home' : S.current?.room?.id;
+  const t = S.current?.type;
+  const key = t === 'home' ? 'home' : t === 'pins' ? 'pins' : t === 'queue' ? 'queue' : t === 'post' ? 'post' : S.current?.room?.id;
   $('nav').querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.nav === key));
 }
 async function joinPublicRoom(roomId){
@@ -693,8 +848,8 @@ $('pin-btn').onclick = async () => {
 
 function openRoom(room){
   if (!room) return openHome();
-  if (!isMember(room.id)) return openRoomAbout(room);
-  if (room.slug === 'lessons21') return openLessonsRoom(room);
+  if (!isMember(room.id)) return openRoomAbout(room);      // 紹介ページ（lessons.js）
+  if (isLessonsRoom(room)) return openLessonsRoom(room);   // 21 Lessons（lessons.js）
   leaveChat();
   S.current = { type:'room', room };
   $('room-title').textContent = room.name;
@@ -708,69 +863,7 @@ function openRoom(room){
   showTab('pinned');
 }
 
-/* ===== 紹介ページ（未所属の部屋。visibility を問わず全員がここに来る） ===== */
-async function openRoomAbout(room){
-  leaveChat();
-  S.current = { type:'room-about', room };
-  $('room-title').textContent = room.name;
-  $('tabs').innerHTML = '';
-  updatePinBtn();
-  highlightNav();
-  $('page').innerHTML = `<div class="empty">読み込み中…</div>`;
-  const { data: cohorts, error } = await supa.from('cohorts').select('*')
-    .eq('room_id', room.id).eq('status', 'open').order('sort_order');
-  if (S.current.room !== room) return;   // 読み込み中に画面が変わったら破棄
-  if (error) { $('page').innerHTML = `<div class="empty">読み込みに失敗しました<br><span style="font-size:11px;color:#999">${esc(error.code || '')} ${esc(error.message || '')}</span></div>`; return; }
-  let h = `<div class="card">
-    <h3><span class="bar"></span>${esc(room.name)}</h3>
-    ${room.subtitle ? `<p class="muted" style="margin:-4px 0 14px">${esc(room.subtitle)}</p>` : ''}
-    ${room.about_what ? `<div class="kv"><b>ここで何をするか</b><span>${richText(room.about_what)}</span></div>` : ''}
-    ${room.about_who  ? `<div class="kv"><b>誰が入っているか</b><span>${richText(room.about_who)}</span></div>`  : ''}
-    ${room.about_how  ? `<div class="kv"><b>入り方</b><span>${richText(room.about_how)}</span></div>`  : ''}
-  </div>`;
-  if ((cohorts || []).length) {
-    h += cohorts.map(c => `
-      <div class="card">
-        <h3><span class="bar"></span>${esc(c.name)}${c.period_label ? `<span class="muted" style="margin-left:8px;font-weight:400">${esc(c.period_label)}</span>` : ''}</h3>
-        ${c.price_jpy != null ? `<div class="kv"><b>参加費</b>¥${Number(c.price_jpy).toLocaleString('ja-JP')}</div>` : ''}
-        ${c.payment_info ? `<div class="kv"><b>お支払い</b><span>${richText(c.payment_info)}</span></div>` : ''}
-        <button class="primary-btn" style="margin-top:10px" data-cohort-join="${c.id}">参加する</button>
-      </div>`).join('');
-  } else {
-    h += `<div class="card"><p style="font-size:13px">${esc(room.next_intake || 'いまは募集していません')}</p></div>`;
-  }
-  $('page').innerHTML = h;
-  $('page').querySelectorAll('[data-cohort-join]').forEach(el => el.onclick = () => joinCohort(el.dataset.cohortJoin, room));
-}
-async function joinCohort(cohortId, room){
-  const { error } = await supa.from('cohort_members').insert({ cohort_id: cohortId, user_id: S.user.id });
-  if (error) return toast('参加に失敗しました：' + error.message);
-  const { data } = await supa.from('memberships').select('*').eq('user_id', S.user.id);
-  S.memberships = data || S.memberships;
-  renderNav(); renderMe();
-  toast('参加しました。お支払いのご案内をご確認ください');
-  openRoom(room);
-}
-
-/* ===== 21 Lessons（仮の中身。シリーズ→Day→本文は次のフェーズで作る） ===== */
-async function openLessonsRoom(room){
-  leaveChat();
-  S.current = { type:'room', room };
-  $('room-title').textContent = room.name;
-  updatePinBtn();
-  $('tabs').innerHTML = '';
-  highlightNav();
-  $('page').innerHTML = `<div class="empty">読み込み中…</div>`;
-  const { data, error } = await supa.from('cohort_members').select('*, cohorts(*)').eq('user_id', S.user.id);
-  if (S.current.room !== room) return;
-  if (error) { $('page').innerHTML = `<div class="empty">読み込みに失敗しました<br><span style="font-size:11px;color:#999">${esc(error.code || '')} ${esc(error.message || '')}</span></div>`; return; }
-  const mine = (data || []).filter(m => m.cohorts && m.cohorts.room_id === room.id);
-  $('page').innerHTML = mine.length ? mine.map(m => `
-    <div class="card">
-      <h3><span class="bar"></span>${esc(m.cohorts.name)}</h3>
-      <p class="muted" style="margin-top:10px">Day一覧・コメントは準備中です。もうしばらくお待ちください。</p>
-    </div>`).join('') : `<div class="empty">まだ参加している回はありません</div>`;
-}
+/* 紹介ページ・21 Lessons の中身は lessons.js にあります */
 function showTab(tab){
   if (S.tab === 'chat' && tab !== 'chat') leaveChat();
   S.tab = tab;
@@ -1677,26 +1770,35 @@ async function openHome(){
   $('tabs').innerHTML = '';
   updatePinBtn();
   highlightNav();
+  /* あいさつ：初回は「はじめましょう。」、2回目からは現在地を1つだけ。出せるものがなければ何も出さない */
+  const nick = (S.profile.display_name && !S.profile.display_name.includes('@')) ? S.profile.display_name : '';
+  const g1 = (S.firstVisit ? 'ようこそ' : 'おかえりなさい') + (nick ? '、' + esc(nick) + 'さん' : '');
+  const greetHtml = (g2, go) => `<div class="greet"><div class="g1">${g1}</div>${g2 ? `<div class="g2">${go ? `<a href="#" id="greet-go">${esc(g2)}</a>` : esc(g2)}</div>` : ''}</div>`;
   if (!S.memberships.length) {
-    $('page').innerHTML = `<div class="card">
-      <h3><span class="bar"></span>ようこそ、Creating Roomへ</h3>
-      <p style="font-size:13px">まだ参加しているルームがありません。プログラム参加者の方は、管理者による登録をお待ちください。左のメニューに「参加できるルーム」がある場合は、そこから参加できます。</p>
+    $('page').innerHTML = greetHtml(S.firstVisit ? 'はじめましょう。' : '') + `<div class="card">
+      <h3><span class="bar"></span>Creating Room について</h3>
+      <p style="font-size:13px">左のメニューにある部屋は、まだ入っていなくても押すと紹介が読めます。募集中の部屋には「募集中」の印がつきます。プログラム参加者の方は、管理者による登録をお待ちください。</p>
     </div>`;
     return;
   }
-  $('page').innerHTML = `<div class="empty">読み込み中…</div>`;
+  $('page').innerHTML = greetHtml('') + `<div class="empty">読み込み中…</div>`;
   const roomName = id => S.rooms.find(r => r.id === id)?.name || '';
-  const [msgs, vids] = await Promise.all([
+  const [msgs, vids, status, lessonItems] = await Promise.all([
     supa.from('messages').select('*').neq('user_id', S.user.id).order('created_at', { ascending:false }).limit(10),
     supa.from('videos').select('*').order('created_at', { ascending:false }).limit(5),
+    S.firstVisit ? Promise.resolve(null) : lessonsHomeStatus().catch(() => null),
+    lessonsFeedItems().catch(() => []),
   ]);
+  if (S.current?.type !== 'home') return;
   const items = [
     ...(msgs.data || []).map(m => ({ t:m.created_at, kind:'msg', m })),
     ...(vids.data || []).map(v => ({ t:v.created_at, kind:'vid', v })),
+    ...(lessonItems || []),
   ].sort((a,b) => b.t < a.t ? -1 : 1).slice(0, 12);
   await ensureNames(items.filter(i => i.kind==='msg').map(i => i.m.user_id));
-  $('page').innerHTML = `<div class="card"><h3><span class="bar"></span>新着</h3>
-    ${items.length ? items.map(i => i.kind === 'msg' ? `
+  const g2 = S.firstVisit ? 'はじめましょう。' : (status?.text || '');
+  $('page').innerHTML = greetHtml(g2, !!status?.go) + `<div class="card"><h3><span class="bar"></span>新着</h3>
+    ${items.length ? items.map(i => i.kind === 'lesson' ? i.html : i.kind === 'msg' ? `
       <div class="feed-item">
         <div class="avatar">${esc(initialOf(S.profilesCache[i.m.user_id]))}</div>
         <div class="feed-body">
@@ -1710,9 +1812,11 @@ async function openHome(){
           <div class="feed-meta">クラス記録に追加<span class="room-chip">${esc(roomName(i.v.room_id))}</span> ・ ${fmtDay(i.t)}</div>
           <div class="feed-text">🎥 ${esc(i.v.title)}</div>
         </div>
-      </div>`).join('') : `<div class="empty">まだ新着はありません</div>`}
+      </div>`).join('') : `<div class="empty">まだ新着はありません。<br>入っている場所で起きたことが、ここに並びます。</div>`}
   </div>
-  <p class="muted">所属している全ルームの新着がここにまとまります。</p>`;
+  <p class="muted">入っている場所で起きたことだけが、ここにまとまります。</p>`;
+  const gg = $('greet-go'); if (gg) gg.onclick = e => { e.preventDefault(); status.go(); };
+  $('page').querySelectorAll('[data-lesson-open]').forEach(el => el.onclick = () => openLessonById(el.dataset.lessonOpen));
 }
 
 /* ================= 権限モーダル ================= */
