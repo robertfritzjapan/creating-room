@@ -410,9 +410,9 @@ a{color:var(--ai)}
       <input type="email" id="magic-email" placeholder="メールアドレス" autocomplete="email">
       <button id="magic-btn">送信</button>
     </div>
-    <div id="magic-sent">メールを送りました。届いたメールの<b>6桁のコード</b>を下に入力してください（メール内のリンクをタップしてもログインできます）。</div>
+    <div id="magic-sent">メールを送りました。届いたメールに書いてある<b>コード（数字）</b>を下に入力してください（メール内のリンクをタップしてもログインできます）。</div>
     <div class="email-row" id="otp-row" style="display:none;margin-top:10px">
-      <input inputmode="numeric" pattern="[0-9]*" maxlength="6" id="otp-code" placeholder="6桁のコード" autocomplete="one-time-code">
+      <input inputmode="numeric" pattern="[0-9]*" maxlength="10" id="otp-code" placeholder="メールに届いたコード" autocomplete="one-time-code">
       <button id="otp-btn">ログイン</button>
     </div>
     <p class="login-note">メールの方はパスワード不要。届いたリンクをタップするだけでログインできます。<br>Facebookアカウントは不要です。</p>
@@ -694,7 +694,7 @@ $('magic-btn').onclick = async () => {
 $('otp-btn').onclick = async () => {
   const email = $('magic-email').value.trim();
   const code = $('otp-code').value.trim();
-  if (!code) return toast('メールに届いた6桁のコードを入力してください');
+  if (!code) return toast('メールに届いたコードを入力してください');
   $('otp-btn').disabled = true;
   const { error } = await supa.auth.verifyOtp({ email, token: code, type: 'email' });
   $('otp-btn').disabled = false;
@@ -965,7 +965,7 @@ async function renderPinned(){
     </div>`);
   }
   if (half.length) h += `<div class="info-grid">${half.join('')}</div>`;
-  if (!sgErr && (sgs.length || editor)) {
+  if (!sgErr && (sgs.length || editor) && room.slug !== 'entrance') {   // はじめかた本体には出さない（Creatingノートのタブ側にある）
     h += `<div class="card sg-card"><h3><span class="bar"></span>🙋 参加希望の受付${editor ? `<span style="margin-left:auto"><button class="res-del" id="add-signup" title="受付を追加">＋ 追加</button></span>` : ''}</h3>
       ${sgs.length ? sgs.map(s => {
         const rs = sgResp.filter(r => r.signup_id === s.id);
@@ -1376,7 +1376,7 @@ async function renderResources(){
   const isEditor = canEdit(roomId);
   S.toolsCache = toolData || [];
   const toolAddBtn = `<button class="add-res-btn" id="add-tool">＋ ツールを追加</button>`;
-  const noTools = S.current.room.slug === 'entrance' || S.current.room.kind === 'tool';
+  const noTools = S.current.room.slug === 'entrance' || S.current.room.kind === 'tool' || navGroupOf(S.current.room) === 'continue';   // はじめかた・道具・つくり続けるには「みんなのツール」を出さない
   const toolSection = noTools ? '' : `<div class="card tool-section"><h3><span class="bar"></span>🛠 みんなのツール<span class="tool-badge">投稿大歓迎</span></h3>
     <p class="tool-note">ここはメンバーのみなさんが参加できるコーナーです。ツールの登録も、使ってみた感想（使い手の声）の投稿も、自由にどうぞ。</p>
     ${toolAddBtn}
