@@ -191,8 +191,8 @@ function openLessonsRoom(room, tab){
   $('room-title').textContent = room.name;
   updatePinBtn();
   const tabs = [['series','シリーズ'],['pinned','固定情報']];
-  if (roleIn(room.id) === 'admin') tabs.push(['members','メンバー']);
-  if (canEdit(room.id)) tabs.push(['cmembers','参加者']);
+  if (canEdit(room.id)) tabs.push(['cmembers','参加者・支払い確認']);
+  if (roleIn(room.id) === 'admin') tabs.push(['members','権限']);
   $('tabs').innerHTML = tabs.map(([k,label]) => `<div class="tab" data-tab="${k}">${label}</div>`).join('');
   $('tabs').querySelectorAll('.tab').forEach(el => el.onclick = () => showLessonsTab(el.dataset.tab));
   highlightNav();
