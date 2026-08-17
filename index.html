@@ -44,7 +44,7 @@ a{color:var(--ai)}
 .nav-item .dot{width:7px;height:7px;border-radius:50%;background:#5d7393;flex-shrink:0}
 .nav-item.active .dot{background:#fff}
 .nav-item.locked{opacity:.6;cursor:pointer}
-.nav-item .join-mini{margin-left:auto;font-size:10px;background:var(--ai);color:#fff;border:none;border-radius:10px;padding:2px 10px;cursor:pointer}
+.nav-item .join-mini{margin-left:auto;font-size:10px;background:var(--ai);color:#fff;border:none;border-radius:10px;padding:2px 10px;cursor:pointer;white-space:nowrap;flex-shrink:0;align-self:center}
 .me{
   margin-top:auto;padding:18px 24px 0;border-top:1px solid rgba(255,255,255,.1);
   display:flex;align-items:center;gap:10px;font-size:12.5px;cursor:pointer;
@@ -277,9 +277,11 @@ a{color:var(--ai)}
 .feed-click:hover{background:#fbfbfa}
 .nav-item.locked{opacity:.5}
 .nav-item .nav-badge{margin-left:auto;font-size:9.5px;background:var(--ai);color:#fff;border-radius:3px;padding:0 5px;font-weight:700}
-.nav-item .nav-tag{margin-left:auto;font-size:9px;background:var(--ai);color:#fff;border-radius:3px;padding:0 5px;font-weight:700;letter-spacing:.04em}
+.nav-item .nav-tag{margin-left:auto;flex-shrink:0;white-space:nowrap;align-self:center;font-size:9px;background:var(--ai);color:#fff;border-radius:3px;padding:0 5px;font-weight:700;letter-spacing:.04em}
 .nav-item .nav-sub{display:block;font-size:10px;color:#77777d;line-height:1.4}
-.nav-item .nav-name{line-height:1.45}
+.nav-item .nav-name{line-height:1.45;flex:1;min-width:0}
+.nav-item .dot{margin-top:7px;align-self:flex-start}
+.nav-item{align-items:flex-start}
 
 /* ===== 紹介ページ ===== */
 .about-title{font-family:'Shippori Mincho',serif;font-size:22px;font-weight:600;margin-bottom:2px}
