@@ -388,7 +388,20 @@ a{color:var(--ai)}
   .sidebar-bg.show{display:block}
   .content{padding:16px 14px}
   .chat-wrap{height:calc(100dvh - 140px)}
-  .topbar{padding:0 12px}
+  /* スマホ：部屋名が長くてもタブが右にはみ出さないよう、タブを2行目に置く */
+  .topbar{padding:0 12px;height:auto;min-height:52px;flex-wrap:wrap;row-gap:0}
+  .topbar h1{font-size:15px;white-space:normal;line-height:1.35;padding:12px 0;flex:1;min-width:0}
+  .tabs{width:100%;order:10;margin-left:0;gap:2px;border-top:1px solid var(--line)}
+  .tabs:empty{display:none}
+  .tab{padding:10px 10px;font-size:12.5px}
+  /* スマホ：クラス記録の1行を2段に（上：サムネ＋タイトル、下：パスワード＋編集） */
+  .video-row{flex-wrap:wrap;align-items:flex-start;gap:10px 12px}
+  .video-info{flex:1 1 calc(100% - 76px);min-width:0}
+  .video-row .pw{order:3;margin-left:0;margin-right:auto}
+  .video-row .res-del{order:4;margin-left:0}
+  .video-row .res-del:first-of-type{margin-left:auto}
+  .vid-att{white-space:normal;word-break:break-all}
+  .res-item{flex-wrap:wrap}
 }
 </style>
 </head>
