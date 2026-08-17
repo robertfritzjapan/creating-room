@@ -757,7 +757,9 @@ async function start(){
     const sccp = S.rooms.find(x => x.slug === 'sccp');
     if (defRoom) openRoom(defRoom);
     else if (sccp && isMember(sccp.id)) openRoom(sccp);
-    else if (S.memberships.length) openRoom(S.rooms.find(x => isMember(x.id)));  // sort_order順で最初の所属ルーム（＝玄関）
+    else if (S.rooms.some(x => isMember(x.id) && x.slug !== 'entrance' && x.kind !== 'tool'))
+      openRoom(S.rooms.find(x => isMember(x.id) && x.slug !== 'entrance' && x.kind !== 'tool'));  // はじめかた以外で入っている部屋のうち一番上（FBS だけの人は FBS へ）
+    else if (S.memberships.length) openRoom(S.rooms.find(x => isMember(x.id)));   // はじめかただけの人（新しい人）は、はじめかたへ
     else openHome();
     if (S.firstVisit) openNameModal();
   } catch (e) {
