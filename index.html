@@ -780,8 +780,8 @@ function renderMe(){
 }
 /* サイドバーは「みんなとつくる／つくり続ける／ひとりでつくる」の3グループ。
    入れない部屋もグレーで見せる（押すと紹介ページ）。募集中の期がある部屋にはバッジ。 */
-const NAV_GROUPS = [['together','みんなとつくる'],['continue','つくり続ける'],['solo','ひとりでつくる']];
-const navGroupOf = r => r.nav_group || (r.kind === 'tool' ? 'solo' : 'together');
+const NAV_GROUPS = [['together','みんなとつくる'],['continue','つくり続ける']];
+const navGroupOf = r => r.kind === 'tool' ? 'hidden' : (r.nav_group || 'together');   // 道具（Creatingノートなど）は「はじめかた」のタブの中に出す
 function renderNav(){
   const entrance = S.rooms.find(r => r.slug === 'entrance' && isMember(r.id));
   const lessonsEditor = S.rooms.some(r => isLessonsRoom(r) && canEdit(r.id));
@@ -819,7 +819,7 @@ function renderNav(){
 }
 function highlightNav(){
   const t = S.current?.type;
-  const key = t === 'home' ? 'home' : t === 'pins' ? 'pins' : t === 'queue' ? 'queue' : t === 'post' ? 'post' : S.current?.room?.id;
+  const key = t === 'home' ? 'home' : t === 'pins' ? 'pins' : t === 'queue' ? 'queue' : t === 'post' ? 'post' : (S.current?.host?.id || S.current?.room?.id);
   $('nav').querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.nav === key));
 }
 async function joinPublicRoom(roomId){
@@ -866,8 +866,11 @@ function openRoom(room){
   $('room-title').textContent = room.name;
   updatePinBtn();
   // はじめかた（entrance）は固定情報とリソースだけ。他の部屋は従来どおり
+  const noteRoom = S.rooms.find(r => r.kind === 'tool' && /Creatingノート/.test(r.name || ''));
   const tabs = room.slug === 'entrance'
-    ? [['pinned','固定情報'],['resources','リソース']]
+    ? [['pinned','固定情報'],['chat','質問'], ...(noteRoom ? [['note','Creatingノート']] : []), ['resources','リソース']]
+    : room.kind === 'tool'
+    ? [['pinned','固定情報'],['chat','質問'],['resources','リソース']]
     : [['pinned','固定情報'],['archive','クラス記録'],['chat','質問'],['resources','リソース']];
   if (roleIn(room.id) === 'admin') tabs.push(['members','メンバー']);   // 管理者だけ。はじめかたでは「誰がここまで来ているか」の一覧になる
   $('tabs').innerHTML = tabs.map(([k,label]) =>
@@ -882,6 +885,13 @@ function showTab(tab){
   if (S.tab === 'chat' && tab !== 'chat') leaveChat();
   S.tab = tab;
   $('tabs').querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
+  // はじめかたの中の「Creatingノート」タブ：道具の部屋の固定情報を、はじめかたの中に出す
+  if (S.current.host) { S.current = { type:'room', room: S.current.host }; }
+  if (tab === 'note') {
+    const noteRoom = S.rooms.find(r => r.kind === 'tool' && /Creatingノート/.test(r.name || ''));
+    if (noteRoom) { S.current = { type:'room', room: noteRoom, host: S.current.room }; renderPinned(); }
+    return;
+  }
   ({pinned:renderPinned, archive:renderArchive, chat:renderChat, resources:renderResources, members:renderMembers})[tab]();
 }
 
@@ -1366,7 +1376,8 @@ async function renderResources(){
   const isEditor = canEdit(roomId);
   S.toolsCache = toolData || [];
   const toolAddBtn = `<button class="add-res-btn" id="add-tool">＋ ツールを追加</button>`;
-  const toolSection = `<div class="card tool-section"><h3><span class="bar"></span>🛠 みんなのツール<span class="tool-badge">投稿大歓迎</span></h3>
+  const noTools = S.current.room.slug === 'entrance' || S.current.room.kind === 'tool';
+  const toolSection = noTools ? '' : `<div class="card tool-section"><h3><span class="bar"></span>🛠 みんなのツール<span class="tool-badge">投稿大歓迎</span></h3>
     <p class="tool-note">ここはメンバーのみなさんが参加できるコーナーです。ツールの登録も、使ってみた感想（使い手の声）の投稿も、自由にどうぞ。</p>
     ${toolAddBtn}
     ${S.toolsCache.length ? S.toolsCache.map(t => toolCardHtml(t, reviewsByTool, isEditor)).join('') : `<div class="empty">まだツールはありません</div>`}
