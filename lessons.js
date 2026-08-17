@@ -217,7 +217,7 @@ async function renderSeries(){
     return `<div class="lrow" data-cohort="${c.id}">
       <div class="lico ${c.status === 'past' ? 'plain' : ''}">${c.total_sessions || 21}</div>
       <div class="lmain">
-        <div class="lt1">${esc(c.name)}</div>
+        <div class="lt1">${esc(c.name)}${tagChips(c)}</div>
         <div class="lt2">${esc(c.period_label || '')}${c.status === 'past' ? '　受講済み・いつでも読み返せます' : ''}${unpaid ? '　<span style="color:var(--ai)">お支払いの確認待ち</span>' : ''}</div>
         ${unpaid && c.payment_info ? `<div class="lt2" style="margin-top:4px">${richText(c.payment_info)}</div>` : ''}
       </div>
@@ -225,29 +225,40 @@ async function renderSeries(){
     </div>`;
   };
   const sec = (t, a, e) => a.length ? `<div class="card"><h3><span class="bar"></span>${t}${e ? `<span class="muted" style="margin-left:auto;font-weight:400">${e}</span>` : ''}</h3>${a.map(row).join('')}</div>` : '';
+  // タグで絞り込む（パーソナル／ビジネス／組織 など。期に付いたタグを集める）
+  const allTags = [...new Set([...mine, ...openNotMine].flatMap(c => c.tags || []))];
+  const tag = L.tagFilter && allTags.includes(L.tagFilter) ? L.tagFilter : null;
+  L.tagFilter = tag;
+  const byTag = a => tag ? a.filter(c => (c.tags || []).includes(tag)) : a;
+  Object.keys(g).forEach(k => g[k] = byTag(g[k]));
+  const openFiltered = byTag(openNotMine);
   let h = '';
+  if (allTags.length) h += `<div class="filters">${['すべて', ...allTags].map(t => `<div class="chip ${(t === 'すべて' ? !tag : tag === t) ? 'on' : ''}" data-tag="${esc(t)}">${esc(t)}</div>`).join('')}</div>`;
   if (editor) h += `<div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="add-res-btn" style="margin-bottom:0" id="go-post">✎ レッスンを出す</button>
       <button class="add-res-btn" style="margin-bottom:0" id="go-queue">↩ 未返信${L.queueCount ? `（${L.queueCount}）` : ''}</button>
       <button class="add-res-btn" style="margin-bottom:0" id="add-cohort">＋ 期を作る</button>
     </div>`;
   h += sec('受講中', g.active) + sec('募集中', g.open, '1日以降の途中参加もできます') + sec('これまでに受けた回', g.past) + (editor ? sec('準備中', g.draft) : '');
-  if (openNotMine.length) h += `<div class="card"><h3><span class="bar"></span>募集中</h3>${openNotMine.map(c => `
+  if (openFiltered.length) h += `<div class="card"><h3><span class="bar"></span>募集中</h3>${openFiltered.map(c => `
       <div class="lrow" data-cohort-about="1">
         <div class="lico">${c.total_sessions || 21}</div>
-        <div class="lmain"><div class="lt1">${esc(c.name)}</div><div class="lt2">${esc(c.period_label || '')}${c.price_jpy != null ? `　¥${Number(c.price_jpy).toLocaleString('ja-JP')}` : ''}</div></div>
+        <div class="lmain"><div class="lt1">${esc(c.name)}${tagChips(c)}</div><div class="lt2">${esc(c.period_label || '')}${c.price_jpy != null ? `　¥${Number(c.price_jpy).toLocaleString('ja-JP')}` : ''}</div></div>
         <div class="lright"><span class="pill-open">募集中</span></div>
       </div>`).join('')}</div>`;
   if (!h.trim() || (!mine.length && !openNotMine.length)) {
     h += `<div class="card"><div class="empty">${rc.length ? 'まだ参加している回はありません' : '次の回は準備中です'}</div></div>`;
   }
   $('page').innerHTML = h;
+  $('page').querySelectorAll('[data-tag]').forEach(el => el.onclick = () => { L.tagFilter = el.dataset.tag === 'すべて' ? null : el.dataset.tag; renderSeries(); });
   $('page').querySelectorAll('[data-cohort]').forEach(el => el.onclick = () => openCohortDays(L.cohorts.find(c => c.id === el.dataset.cohort)));
   $('page').querySelectorAll('[data-cohort-about]').forEach(el => el.onclick = () => openRoomAbout(room));
   const gp = $('go-post'); if (gp) gp.onclick = () => openPostPage();
   const gq = $('go-queue'); if (gq) gq.onclick = () => openQueuePage();
   const ac = $('add-cohort'); if (ac) ac.onclick = () => openCohortModal(null, room);
 }
+
+const tagChips = c => (c.tags || []).map(t => `<span class="tagchip">${esc(t)}</span>`).join('');
 
 /* ============================================================
    Day 一覧
@@ -780,6 +791,7 @@ function openCohortModal(c, room){
   $('ch-payurl').value = c?.payment_url || '';
   $('ch-payinfo').value = c?.payment_info || '';
   $('ch-status').value = c?.status || 'draft';
+  $('ch-tags').value = (c?.tags || []).join('、');
   m.style.display = 'flex';
   $('ch-save').onclick = async () => {
     const name = $('ch-name').value.trim();
@@ -787,7 +799,8 @@ function openCohortModal(c, room){
     const row = { room_id: room.id, name, period_label: $('ch-period').value.trim() || null, starts_on: $('ch-starts').value || null,
       total_sessions: Number($('ch-total').value) || 21, intake_from: $('ch-from').value || null, intake_to: $('ch-to').value || null,
       price_jpy: $('ch-price').value === '' ? null : Number($('ch-price').value), payment_url: $('ch-payurl').value.trim() || null,
-      payment_info: $('ch-payinfo').value.trim() || null, status: $('ch-status').value };
+      payment_info: $('ch-payinfo').value.trim() || null, status: $('ch-status').value,
+      tags: $('ch-tags').value.split(/[、,\s]+/).map(t => t.trim()).filter(Boolean) };
     const { error } = c ? await supa.from('cohorts').update(row).eq('id', c.id) : await supa.from('cohorts').insert(row);
     if (error) return toast('保存に失敗しました：' + error.message);
     m.style.display = 'none';

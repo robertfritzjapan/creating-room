@@ -293,6 +293,7 @@ a{color:var(--ai)}
 .ghost-btn{margin-top:10px;background:none;border:1px solid #d8d4d0;border-radius:20px;padding:6px 16px;font-size:12px;color:#6d6a67;cursor:pointer}
 .ghost-btn:hover,.ghost-btn.on{border-color:var(--ai);color:var(--ai)}
 .pill-open{display:inline-block;background:var(--ai);color:#fff;border-radius:5px;padding:1px 9px;font-size:10.5px;font-weight:700}
+.tagchip{display:inline-block;margin-left:6px;vertical-align:middle;font-size:10px;font-weight:600;color:#6d6a67;background:#f0eeec;border-radius:4px;padding:0 6px;letter-spacing:.03em}
 .pill-g{display:inline-block;background:#f0eeec;color:#7c7874;border-radius:5px;padding:1px 9px;font-size:10.5px;font-weight:700}
 
 /* ===== 21 Lessons：一覧 ===== */
@@ -628,6 +629,8 @@ a{color:var(--ai)}
     <textarea class="form-input" id="ch-payinfo" rows="3" placeholder="例：PayPay（ID：xxxx）または お振込。確認でき次第、読めるようになります。"></textarea>
     <label class="form-label">決済リンク（Stripe など。任意）</label>
     <input class="form-input" id="ch-payurl" placeholder="https://…">
+    <label class="form-label">タグ（任意・「、」区切りで複数可。例：パーソナル、ビジネス、組織）</label>
+    <input class="form-input" id="ch-tags" placeholder="例：ビジネス、組織">
     <label class="form-label">状態</label>
     <select class="form-input" id="ch-status">
       <option value="draft">draft ── 準備中（参加者に見えない）</option>
@@ -728,6 +731,12 @@ async function start(){
     S.memberships = m.data || [];
     S.profilesCache[uid] = S.profile.display_name;
     S.firstVisit = !S.profile.display_name || S.profile.display_name.includes('@');
+    // はじめかた（entrance）は公開の部屋なので、まだ入っていなければ自動で入る（初回ログインの人が空のホームに落ちないように）
+    const entranceRoom = S.rooms.find(x => x.slug === 'entrance' && x.visibility === 'public');
+    if (entranceRoom && !isMember(entranceRoom.id)) {
+      const { error: je } = await supa.from('memberships').insert({ user_id: uid, room_id: entranceRoom.id, role: 'member' });
+      if (!je) { const { data: mm } = await supa.from('memberships').select('*').eq('user_id', uid); S.memberships = mm || S.memberships; }
+    }
     await lessonsBootstrap();   // 21 Lessons：期と自分の参加を読む（lessons.js）
     renderMe(); renderNav();
     const defRoom = S.rooms.find(x => x.id === S.profile.default_room && isMember(x.id));
