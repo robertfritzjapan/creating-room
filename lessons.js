@@ -793,6 +793,8 @@ function openCohortModal(c, room){
   $('ch-status').value = c?.status || 'draft';
   $('ch-tags').value = (c?.tags || []).join('、');
   m.style.display = 'flex';
+  m.onclick = () => { m.style.display = 'none'; };            // 外側を押すと閉じる
+  $('ch-cancel').onclick = () => { m.style.display = 'none'; };
   $('ch-save').onclick = async () => {
     const name = $('ch-name').value.trim();
     if (!name) return toast('名前は必須です');

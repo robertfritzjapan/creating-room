@@ -638,7 +638,7 @@ a{color:var(--ai)}
       <option value="active">active ── 開講中</option>
       <option value="past">past ── 終了（買った人は読み返せる）</option>
     </select>
-    <div style="margin-top:20px"><button class="primary-btn" id="ch-save">保存する</button></div>
+    <div style="margin-top:20px;display:flex;gap:10px;align-items:center"><button class="primary-btn" id="ch-save">保存する</button><button class="add-res-btn" style="margin:0" id="ch-cancel">やめる</button></div>
   </div>
 </div>
 
@@ -869,7 +869,7 @@ function openRoom(room){
   const noteRoom = S.rooms.find(r => r.kind === 'tool' && /Creatingノート/.test(r.name || ''));
   const tabs = room.slug === 'entrance'
     ? [['pinned','固定情報'],['chat','質問'], ...(noteRoom ? [['note','Creatingノート']] : []), ['resources','リソース']]
-    : room.kind === 'tool'
+    : (room.kind === 'tool' || navGroupOf(room) === 'continue')   // 道具と「つくり続ける」の部屋は単発なのでクラス記録なし
     ? [['pinned','固定情報'],['chat','質問'],['resources','リソース']]
     : [['pinned','固定情報'],['archive','クラス記録'],['chat','質問'],['resources','リソース']];
   if (roleIn(room.id) === 'admin') tabs.push(['members','メンバー']);   // 管理者だけ。はじめかたでは「誰がここまで来ているか」の一覧になる
