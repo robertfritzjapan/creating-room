@@ -142,6 +142,10 @@ a{color:var(--ai)}
 .res-item:last-child{border:none}
 .res-del{margin-left:auto;background:none;border:none;color:var(--gray);font-size:14px;cursor:pointer;padding:6px;flex-shrink:0}
 .res-del:hover{color:var(--ai)}
+.res-del:disabled{opacity:.25;cursor:default}
+.res-del.mv{margin-left:0;font-size:12px;padding:6px 4px}
+.video-embed{position:relative;width:100%;max-width:720px;aspect-ratio:16/9;margin:10px 0;border-radius:10px;overflow:hidden;background:#000}
+.video-embed iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 .add-res-btn{display:inline-block;background:var(--white);border:1px dashed var(--gray);border-radius:20px;padding:8px 20px;font-size:13px;color:var(--gray);cursor:pointer;margin-bottom:16px}
 .add-res-btn:hover{border-color:var(--ai);color:var(--ai)}
 .form-label{display:block;font-size:13px;color:var(--gray);margin:12px 0 4px}
@@ -972,8 +976,26 @@ function fileHref(a){
 }
 
 /* ===== 固定情報 ===== */
+// YouTube / Vimeo の URL だけの行 → 埋め込みプレーヤーの src。該当しなければ null
+function videoEmbedSrc(l){
+  let m;
+  if ((m = l.match(/^https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{6,})/)))
+    return `https://www.youtube.com/embed/${m[1]}`;
+  if ((m = l.match(/^https?:\/\/(?:www\.)?vimeo\.com\/(?:video\/)?(\d+)(?:\/([\da-f]+))?/)))
+    return `https://player.vimeo.com/video/${m[1]}${m[2] ? `?h=${m[2]}` : ''}`;
+  if ((m = l.match(/^https?:\/\/player\.vimeo\.com\/video\/(\d+)(\?[^\s]*)?/)))
+    return `https://player.vimeo.com/video/${m[1]}${m[2] || ''}`;
+  return null;
+}
 function richText(t){
-  return esc(t || '').split('\n').map(line => {
+  return (t || '').split('\n').map(rawLine => {
+    // 動画判定はエスケープ前の生の行で（& が &amp; になる前）
+    const raw = rawLine.trim();
+    const vsrc = /^https?:\/\/\S+$/.test(raw) ? videoEmbedSrc(raw) : null;
+    if (vsrc) {
+      return `<div class="video-embed"><iframe src="${esc(vsrc)}" loading="lazy" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen title="video"></iframe></div>`;
+    }
+    const line = esc(rawLine);
     const l = line.trim();
     if (/^https?:\/\/\S+$/.test(l) &&
         (/\.(png|jpe?g|gif|webp|svg)(\?|#|$)/i.test(l) || l.includes('/room-media/'))) {
@@ -1050,9 +1072,10 @@ async function renderPinned(){
       <div class="gcal-wrap"><iframe src="${gsrc}" loading="lazy" title="ルームカレンダー"></iframe></div>
     </div>`;
   }
+  const secN = (p.sections || []).length;
   (p.sections || []).forEach((s, idx) => {
     const btns = editor
-      ? `<span style="margin-left:auto;flex-shrink:0"><button class="res-del" data-sedit="${idx}" title="編集">✏️</button><button class="res-del" data-sdel="${idx}" title="削除">✕</button></span>`
+      ? `<span style="margin-left:auto;flex-shrink:0;display:flex;align-items:center"><button class="res-del mv" data-smove="${idx}:-1" title="上へ" ${idx === 0 ? 'disabled' : ''}>▲</button><button class="res-del mv" data-smove="${idx}:1" title="下へ" ${idx === secN - 1 ? 'disabled' : ''}>▼</button><button class="res-del" data-sedit="${idx}" title="編集">✏️</button><button class="res-del" data-sdel="${idx}" title="削除">✕</button></span>`
       : '';
     h += `<div class="card">
       <h3><span class="bar"></span>${esc(s.title || '')}${btns}</h3>
@@ -1064,7 +1087,7 @@ async function renderPinned(){
   const as = $('add-sec'); if (as) as.onclick = () => openSecModal(null);
   const asg = $('add-signup'); if (asg) asg.onclick = () => {
     ['sg-title','sg-date','sg-note'].forEach(id => $(id).value = '');
-    $('sg-modal-room').textContent = S.current.room.name + ' の固定情報に表示されます';
+    $('sg-modal-room').textContent = S.current.room.name + (S.current.room.kind === 'tool' ? ' （はじめかた › Creatingノート）に表示されます' : ' の固定情報に表示されます');
     $('sg-modal').style.display = 'flex';
   };
   $('page').querySelectorAll('[data-sg-join]').forEach(el => el.onclick = async () => {
@@ -1086,6 +1109,15 @@ async function renderPinned(){
     if (error) return toast('削除に失敗しました：' + error.message);
     toast('受付を削除しました');
     renderPinned();
+  });
+  $('page').querySelectorAll('[data-smove]').forEach(el => el.onclick = async () => {
+    const [i, d] = el.dataset.smove.split(':').map(Number);
+    const pinned = structuredClone(S.current.room.pinned || {});
+    const arr = pinned.sections || [];
+    const j = i + d;
+    if (j < 0 || j >= arr.length) return;
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+    if (await savePinned(pinned)) renderPinned();
   });
   $('page').querySelectorAll('[data-sedit]').forEach(el => el.onclick = () => openSecModal(Number(el.dataset.sedit)));
   $('page').querySelectorAll('[data-sdel]').forEach(el => el.onclick = async () => {
@@ -1446,9 +1478,10 @@ async function renderResources(){
   } else {
     const groups = {};
     resData.forEach(r => (groups[r.category] = groups[r.category] || []).push(r));
-    resSection = addBtn + Object.entries(groups).map(([cat, items]) => `
-      <div class="card"><h3><span class="bar"></span>${esc(cat)}</h3>
-        ${items.map(r => `
+    const catList = Object.keys(groups);   // 出現順＝sort_order 順。並べ替えると保存時に振り直す
+    resSection = addBtn + Object.entries(groups).map(([cat, items], ci) => `
+      <div class="card"><h3><span class="bar"></span>${esc(cat)}${isEditor ? `<span style="margin-left:auto;flex-shrink:0;display:flex;align-items:center"><button class="res-del mv" data-cmove="${ci}:-1" title="この分類を上へ" ${ci === 0 ? 'disabled' : ''}>▲</button><button class="res-del mv" data-cmove="${ci}:1" title="この分類を下へ" ${ci === catList.length - 1 ? 'disabled' : ''}>▼</button></span>` : ''}</h3>
+        ${items.map((r, ri) => `
           ${(() => {
             const atts = (r.attachments && r.attachments.length) ? r.attachments
               : (r.file_url ? [{ name: r.file_name || 'ファイル', url: r.file_url }] : []);
@@ -1460,9 +1493,11 @@ async function renderResources(){
             ${atts.length ? `<div class="vid-atts" style="margin-top:5px">${atts.map(a =>
               `<a class="vid-att" href="${esc(fileHref(a))}" target="_blank" rel="noopener">📎 ${esc(a.name)}</a>`).join('')}</div>` : ''}</div>`;
           })()}
-            ${isEditor ? `<button class="res-del" data-redit="${r.id}" title="編集">✏️</button><button class="res-del" data-del="${r.id}" title="削除">✕</button>` : ''}
+            ${isEditor ? `<span style="margin-left:auto;flex-shrink:0;display:flex;align-items:center"><button class="res-del mv" data-rmove="${r.id}:-1" title="上へ" ${ri === 0 ? 'disabled' : ''}>▲</button><button class="res-del mv" data-rmove="${r.id}:1" title="下へ" ${ri === items.length - 1 ? 'disabled' : ''}>▼</button><button class="res-del" data-redit="${r.id}" title="編集">✏️</button><button class="res-del" data-del="${r.id}" title="削除">✕</button></span>` : ''}
           </div>`).join('')}
       </div>`).join('');
+    S.resGroups = groups;
+    S.resCatList = catList;
   }
 
   $('page').innerHTML = resSection + toolSection;
@@ -1508,6 +1543,41 @@ async function renderResources(){
 
   const ab = $('add-res');
   if (ab) ab.onclick = () => openResModal(null);
+  // 並べ替え：分類の順（cmove）とアイテムの順（rmove）。保存時に部屋内の sort_order を 10,20,30… で振り直す
+  async function saveResOrder(orderedGroups){
+    const flat = orderedGroups.flat();
+    const updates = flat.map((r, i) => ({ id: r.id, sort_order: (i + 1) * 10 })).filter(u => {
+      const cur = flat.find(r => r.id === u.id); return cur.sort_order !== u.sort_order;
+    });
+    const results = await Promise.all(updates.map(u => supa.from('resources').update({ sort_order: u.sort_order }).eq('id', u.id)));
+    const bad = results.find(x => x.error);
+    if (bad) return toast('並べ替えの保存に失敗しました：' + bad.error.message);
+    renderResources();
+  }
+  $('page').querySelectorAll('[data-cmove]').forEach(el => el.onclick = e => {
+    e.preventDefault(); e.stopPropagation();
+    const [ci, d] = el.dataset.cmove.split(':').map(Number);
+    const cats = [...(S.resCatList || [])];
+    const j = ci + d;
+    if (j < 0 || j >= cats.length) return;
+    [cats[ci], cats[j]] = [cats[j], cats[ci]];
+    saveResOrder(cats.map(c => S.resGroups[c]));
+  });
+  $('page').querySelectorAll('[data-rmove]').forEach(el => el.onclick = e => {
+    e.preventDefault(); e.stopPropagation();
+    const [id, dStr] = el.dataset.rmove.split(':'); const d = Number(dStr);
+    const cats = S.resCatList || [];
+    const groupsCopy = cats.map(c => [...S.resGroups[c]]);
+    for (const items of groupsCopy) {
+      const i = items.findIndex(r => r.id === id);
+      if (i < 0) continue;
+      const j = i + d;
+      if (j < 0 || j >= items.length) return;
+      [items[i], items[j]] = [items[j], items[i]];
+      break;
+    }
+    saveResOrder(groupsCopy);
+  });
   $('page').querySelectorAll('[data-open]').forEach(el => el.onclick = e => {
     if (e.target.closest('a, button')) return;
     window.open(el.dataset.open, '_blank', 'noopener');
@@ -1741,7 +1811,7 @@ $('res-save').onclick = async () => {
   };
   const q = S.editingRes
     ? supa.from('resources').update(row).eq('id', S.editingRes.id)
-    : supa.from('resources').insert({ ...row, room_id: S.current.room.id, sort_order: 100 });
+    : supa.from('resources').insert({ ...row, room_id: S.current.room.id, sort_order: Math.max(100, ...(S.resCache || []).map(r => r.sort_order || 0)) + 10 });   // 末尾に追加
   const { error } = await q;
   if (error) return toast('保存に失敗しました：' + error.message);
   $('res-modal').style.display = 'none';
