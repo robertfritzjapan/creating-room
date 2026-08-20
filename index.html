@@ -149,14 +149,15 @@ a{color:var(--ai)}
 .form-input:focus{border-color:var(--ai)}
 .res-icon{width:38px;height:38px;border-radius:8px;background:var(--ai-soft);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
 .res-name{font-weight:600;font-size:15px}
-.res-sub{font-size:13.5px;color:#4a4a50;white-space:pre-wrap;line-height:1.75}
+.res-sub{font-size:13.5px;color:#4a4a50;line-height:1.75}
 
 /* ===== ツール ===== */
 .vid-assign{margin-top:6px;font-size:14px;background:var(--ai-soft);border-radius:8px;padding:6px 10px;white-space:pre-wrap}
 .sg-item{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:10px}
 .sg-head{display:flex;align-items:center;gap:8px}
 .sg-head .res-del{margin-left:auto;flex-shrink:0}
-.sg-date{font-size:12px;color:var(--gray)}
+.sg-date{font-size:12px;color:var(--gray);white-space:nowrap}
+.sg-date b{font-weight:700;color:var(--ink);font-size:13px}
 .sg-note{font-size:14px;margin-top:4px;white-space:pre-wrap;color:var(--ink)}
 .sg-status{font-size:13.5px;margin-top:8px}
 .sg-btn{margin:10px 0 0}
@@ -562,6 +563,8 @@ details.sec-more .sec-body{font-size:13.5px;line-height:1.9;margin-top:8px;
     <textarea class="form-input" id="inf-sched" rows="4"></textarea>
     <label class="form-label">補足メモ</label>
     <textarea class="form-input" id="inf-note" rows="2"></textarea>
+    <label class="form-label">受付の見出し（任意）</label>
+    <input class="form-input" id="inf-sgtitle" placeholder="空欄なら「参加希望の受付」　例：ミニレクチャー参加の受付">
     <label class="form-label">GoogleカレンダーID（任意・複数可）</label>
     <textarea class="form-input" id="inf-gcal" rows="2" placeholder="1行に1つ　例：xxxxx@group.calendar.google.com"></textarea>
     <p class="sub" style="margin-top:4px">このルームの固定情報にカレンダーを埋め込みます。複数入れると重ねて表示されます。各カレンダーは「一般公開」設定が必要です。</p>
@@ -572,12 +575,20 @@ details.sec-more .sec-body{font-size:13.5px;line-height:1.9;margin-top:8px;
 <!-- ===== 参加希望の受付モーダル（編集者以上） ===== -->
 <div class="modal-bg" id="sg-modal">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:420px">
-    <h3>参加希望の受付を追加</h3>
+    <h3 id="sg-modal-title">参加希望の受付を追加</h3>
     <p class="sub" id="sg-modal-room"></p>
     <label class="form-label">タイトル</label>
     <input class="form-input" id="sg-title" placeholder="例：11/20（木）夜 FBSラボ（練習会）">
-    <label class="form-label">日付（任意）</label>
-    <input class="form-input" id="sg-date" type="date">
+    <div style="display:flex;gap:10px">
+      <div style="flex:1">
+        <label class="form-label">日付（任意）</label>
+        <input class="form-input" id="sg-date" type="date">
+      </div>
+      <div style="width:130px;flex-shrink:0">
+        <label class="form-label">開始時間（任意）</label>
+        <input class="form-input" id="sg-time" type="time" step="300">
+      </div>
+    </div>
     <label class="form-label">補足（任意）</label>
     <textarea class="form-input" id="sg-note" rows="3" placeholder="例：時間・場所の候補、締切など"></textarea>
     <div style="margin-top:20px"><button class="primary-btn" id="sg-save">受付を開始する</button></div>
@@ -779,7 +790,7 @@ const EN = {
   'ホーム':'Home','新着フィード':'What\'s new','ピンした場所':'Pinned','未返信':'Unanswered','レッスンを出す':'Post a lesson',
   'みんなとつくる':'Create together','つくり続ける':'Keep creating','ログアウト':'Log out','権限を見る':'My access',
   '管理者':'Admin','編集者':'Editor','メンバー':'Member','未所属':'—',
-  '固定情報':'Info','クラス記録':'Class records','質問':'Questions','リソース':'Resources','シリーズ':'Series','Creatingノート':'Creating Note',
+  '固定情報':'Info','クラス記録':'Class records','質問':'Questions','リソース':'Resources','シリーズ':'Series','Creatingノート':'Creating Note','今日をつくる':'Create Today',
   '参加者・支払い確認':'Participants','権限':'Roles',
   '📔 はじめかた':'📔 Getting started','はじめかた':'Getting started',
   '構造コンサルタント認定（SCCP）':'SCCP – Structural Consultant Certification','フリッツ・ビジネススクール':'Fritz Business School',
@@ -994,8 +1005,9 @@ function openRoom(room){
   $('room-title').textContent = t(room.name);
   updatePinBtn();
   // はじめかた（entrance）は固定情報とリソースだけ。他の部屋は従来どおり
+  const toolRoom = S.rooms.find(r => r.kind === 'tool');       // 道具の部屋。名前を変えるとタブ名も変わる
   const tabs = room.slug === 'entrance'
-    ? [['pinned','固定情報'],['chat','質問'],['note','Creatingノート'],['resources','リソース']]
+    ? [['pinned','固定情報'],['chat','質問'],['note', toolRoom?.name || '今日をつくる'],['resources','リソース']]
     : (room.kind === 'tool' || navGroupOf(room) === 'continue')   // 道具と「つくり続ける」の部屋は単発なのでクラス記録なし
     ? [['pinned','固定情報'],['chat','質問'],['resources','リソース']]
     : [['pinned','固定情報'],['archive','クラス記録'],['chat','質問'],['resources','リソース']];
@@ -1015,7 +1027,7 @@ function showTab(tab){
   // はじめかたの中の「Creatingノート」タブ：道具の部屋の固定情報を、はじめかたの中に出す
   if (S.current.host) { S.current = { type:'room', room: S.current.host }; }
   if (tab === 'note') {
-    const noteRoom = S.rooms.find(r => r.kind === 'tool' && /Creatingノート/.test(r.name || ''));
+    const noteRoom = S.rooms.find(r => r.kind === 'tool');
     if (noteRoom) S.current = { type:'room', room: noteRoom, host: S.current.room };
     renderNote(!!noteRoom);
     return;
@@ -1146,7 +1158,12 @@ async function renderNote(hasRoom){
   // ノート本体は、1枚目のカード（緊張構造チャート）の中に入れる。
   // セクションがまだ作られていないときは、単独のカードとして出す。
   const host = page.querySelector('.sec-card');
-  if (host) host.insertAdjacentHTML('beforeend', `<div class="cn-form">${formHtml}</div>`);
+  if (host) {
+    host.insertAdjacentHTML('beforeend', `<div class="cn-form">${formHtml}</div>`);
+    // チャートは一番上。参加希望の受付や Zoom より先に出す（編集者のツールバーだけ上に残す）
+    const bar = page.firstElementChild?.querySelector?.('#edit-info') ? page.firstElementChild : null;
+    if (bar) bar.after(host); else page.prepend(host);
+  }
   else page.insertAdjacentHTML('afterbegin',
     `<div class="card sec-card"><h3><span class="bar"></span>緊張構造チャート</h3>
       <div class="sec-lead">1日5分、1日1日、望む成果へ前進していくためのノートです。</div>
@@ -1213,6 +1230,19 @@ function richText(t){
     return line.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
   }).join('<br>');
 }
+/* 固定情報を描き直す。Creatingノートのタブにいるときは、タブごと描き直してノートを保ち直す */
+const repaintPinned = () => (S.tab === 'note' ? showTab('note') : renderPinned());
+
+/* コピー枠のボタンを効かせる。固定情報でもリソースでも使う */
+function bindCopyBoxes(root){
+  (root || document).querySelectorAll('[data-copybox]').forEach(el => el.onclick = async e => {
+    e.stopPropagation(); e.preventDefault();                 // リソースの行そのものが押されないように
+    const txt = el.closest('.copybox').querySelector('pre').textContent;
+    try { await navigator.clipboard.writeText(txt); toast('コピーしました'); }
+    catch (err) { window.prompt('長押し（または Ctrl+C）でコピーしてください', txt); }
+  });
+}
+
 /* 本文の中で --- ではさんだところを、コピーできる枠にする（プロンプトなど） */
 function richCopy(body){
   return String(body || '').split(/^-{3,}$/m).map((seg, i) => i % 2
@@ -1231,7 +1261,10 @@ async function renderPinned(opts = {}){
   const { data: sgData, error: sgErr } = await supa.from('signups').select('*')
     .eq('room_id', room.id).order('event_date', { ascending: true });
   if (!sgErr) {
-    sgs = sgData || [];
+    // 日付 → 開始時間 の順に並べる（event_time 列がまだない環境でも壊れないよう、並べ替えは画面側で）
+    sgs = (sgData || []).slice().sort((a, b) =>
+      String(a.event_date || '9999').localeCompare(String(b.event_date || '9999')) ||
+      String(a.event_time || '99').localeCompare(String(b.event_time || '99')));
     if (sgs.length) {
       const { data: rd } = await supa.from('signup_responses').select('*').in('signup_id', sgs.map(s => s.id));
       sgResp = rd || [];
@@ -1258,12 +1291,13 @@ async function renderPinned(opts = {}){
   }
   // 参加希望の受付は、その日に動くもの。Zoom やスケジュールより先に出す
   if (!sgErr && (sgs.length || editor) && room.slug !== 'entrance') {   // はじめかた本体には出さない（Creatingノートのタブ側にある）
-    h += `<div class="card sg-card"><h3><span class="bar"></span>🙋 参加希望の受付${editor ? `<span style="margin-left:auto"><button class="res-del" id="add-signup" title="受付を追加">＋ 追加</button></span>` : ''}</h3>
+    h += `<div class="card sg-card"><h3><span class="bar"></span>🙋 ${esc(p.signup_title || '参加希望の受付')}${editor ? `<span style="margin-left:auto"><button class="res-del" id="add-signup" title="受付を追加">＋ 追加</button></span>` : ''}</h3>
       ${sgs.length ? sgs.map(s => {
         const rs = sgResp.filter(r => r.signup_id === s.id);
         const mine = rs.some(r => r.user_id === S.user.id);
         return `<div class="sg-item">
-          <div class="sg-head"><b>${esc(s.title)}</b>${s.event_date ? `<span class="sg-date">${fmtDay(s.event_date)}</span>` : ''}${editor ? `<button class="res-del" data-sg-del="${s.id}" title="受付を終了して削除">✕</button>` : ''}</div>
+          <div class="sg-head"><b>${esc(s.title)}</b>${s.event_date || s.event_time
+            ? `<span class="sg-date">${s.event_date ? fmtDay(s.event_date) : ''}${s.event_time ? ` <b>${esc(String(s.event_time).slice(0, 5))}</b>〜` : ''}</span>` : ''}${editor ? `<button class="res-del" data-sg-edit="${s.id}" title="日時や文言を直す">✏️</button><button class="res-del" data-sg-del="${s.id}" title="受付を終了して削除">✕</button>` : ''}</div>
           ${s.note ? `<div class="sg-note">${esc(s.note)}</div>` : ''}
           <div class="sg-status">現在 <b>${rs.length}</b> 人が参加希望${rs.length ? `：${rs.map(r => esc(S.profilesCache[r.user_id] || '…')).join('、')}` : ''}</div>
           <button class="add-res-btn sg-btn ${mine ? 'on' : ''}" data-sg-join="${s.id}" data-mine="${mine ? '1' : ''}">${mine ? '✓ 参加希望済み（タップで取り消し）' : '🙋 参加したい'}</button>
@@ -1315,18 +1349,12 @@ async function renderPinned(opts = {}){
     </div>`;
   });
   $('page').innerHTML = h || `<div class="empty">固定情報はまだありません</div>`;
-  $('page').querySelectorAll('[data-copybox]').forEach(el => el.onclick = async () => {
-    const txt = el.closest('.copybox').querySelector('pre').textContent;
-    try { await navigator.clipboard.writeText(txt); toast('コピーしました'); }
-    catch (e) { window.prompt('長押し（または Ctrl+C）でコピーしてください', txt); }
-  });
+  bindCopyBoxes($('page'));
   const ei = $('edit-info'); if (ei) ei.onclick = openInfoModal;
   const as = $('add-sec'); if (as) as.onclick = () => openSecModal(null);
-  const asg = $('add-signup'); if (asg) asg.onclick = () => {
-    ['sg-title','sg-date','sg-note'].forEach(id => $(id).value = '');
-    $('sg-modal-room').textContent = S.current.room.name + ' の固定情報に表示されます';
-    $('sg-modal').style.display = 'flex';
-  };
+  const asg = $('add-signup'); if (asg) asg.onclick = () => openSignupModal(null);
+  $('page').querySelectorAll('[data-sg-edit]').forEach(el => el.onclick = () =>
+    openSignupModal(sgs.find(x => x.id === el.dataset.sgEdit)));
   $('page').querySelectorAll('[data-sg-join]').forEach(el => el.onclick = async () => {
     const id = el.dataset.sgJoin;
     const joined = !!el.dataset.mine;
@@ -1338,21 +1366,21 @@ async function renderPinned(opts = {}){
     el.disabled = false;
     if (error) return toast('更新に失敗しました：' + error.message);
     toast(joined ? '参加希望を取り消しました' : '参加希望を送りました！');
-    renderPinned();
+    repaintPinned();
   });
   $('page').querySelectorAll('[data-sg-del]').forEach(el => el.onclick = async () => {
     if (!confirm('この受付を終了して削除しますか？（参加希望の記録も消えます）')) return;
     const { error } = await supa.from('signups').delete().eq('id', el.dataset.sgDel);
     if (error) return toast('削除に失敗しました：' + error.message);
     toast('受付を削除しました');
-    renderPinned();
+    repaintPinned();
   });
   $('page').querySelectorAll('[data-sedit]').forEach(el => el.onclick = () => openSecModal(Number(el.dataset.sedit)));
   $('page').querySelectorAll('[data-sdel]').forEach(el => el.onclick = async () => {
     if (!confirm('このセクションを削除しますか？')) return;
     const pinned = structuredClone(S.current.room.pinned || {});
     (pinned.sections || []).splice(Number(el.dataset.sdel), 1);
-    if (await savePinned(pinned)) { toast('削除しました'); renderPinned(); }
+    if (await savePinned(pinned)) { toast('削除しました'); repaintPinned(); }
   });
 }
 async function savePinned(pinned){
@@ -1375,6 +1403,7 @@ function openInfoModal(){
   $('inf-sched-title').value = p.schedule_title || '';
   $('inf-sched').value = (p.schedule || []).join('\n');
   $('inf-note').value = p.note || '';
+  $('inf-sgtitle').value = p.signup_title || '';
   $('inf-gcal').value = (Array.isArray(p.gcal) ? p.gcal : [p.gcal]).filter(Boolean).join('\n');
   $('info-modal').style.display = 'flex';
 }
@@ -1390,6 +1419,8 @@ $('info-save').onclick = async () => {
   pinned.schedule_title = $('inf-sched-title').value.trim();
   pinned.schedule = $('inf-sched').value.split('\n').map(l => l.trim()).filter(Boolean);
   pinned.note = $('inf-note').value.trim();
+  pinned.signup_title = $('inf-sgtitle').value.trim();
+  if (!pinned.signup_title) delete pinned.signup_title;
   pinned.gcal = $('inf-gcal').value.split(/[\n,]+/).map(l => {
     const m = l.match(/[?&]src=([^&\s]+)/);
     return (m ? decodeURIComponent(m[1]) : l).trim();
@@ -1399,7 +1430,7 @@ $('info-save').onclick = async () => {
   if (await savePinned(pinned)) {
     $('info-modal').style.display = 'none';
     toast('基本情報を保存しました');
-    renderPinned();
+    repaintPinned();
   }
 };
 
@@ -1442,7 +1473,7 @@ $('sec-save').onclick = async () => {
   if (await savePinned(pinned)) {
     $('sec-modal').style.display = 'none';
     toast('保存しました');
-    renderPinned();
+    repaintPinned();
   }
 };
 
@@ -1716,7 +1747,7 @@ async function renderResources(){
             return `<div class="res-item" ${target ? `data-open="${esc(target)}" style="cursor:pointer"` : ''}>
             <div class="res-icon">${esc(r.icon || '📄')}</div>
             <div style="min-width:0"><div class="res-name">${esc(r.title)}</div>
-            ${r.subtitle ? `<div class="res-sub">${esc(r.subtitle)}</div>` : ''}
+            ${r.subtitle ? `<div class="res-sub">${richCopy(r.subtitle)}</div>` : ''}
             ${atts.length ? `<div class="vid-atts" style="margin-top:5px">${atts.map(a =>
               `<a class="vid-att" href="${esc(fileHref(a))}" target="_blank" rel="noopener">📎 ${esc(a.name)}</a>`).join('')}</div>` : ''}</div>`;
           })()}
@@ -1726,6 +1757,7 @@ async function renderResources(){
   }
 
   $('page').innerHTML = resSection + toolSection;
+  bindCopyBoxes($('page'));
 
   const atb = $('add-tool');
   if (atb) atb.onclick = () => openToolModal(null);
@@ -1786,20 +1818,36 @@ async function renderResources(){
   });
 }
 $('sg-modal').onclick = () => $('sg-modal').style.display = 'none';
+/* 追加と編集の両方に使う。s を渡すと編集 */
+function openSignupModal(s){
+  S.editingSignup = s || null;
+  $('sg-modal-title').textContent = s ? '参加希望の受付を直す' : '参加希望の受付を追加';
+  $('sg-title').value = s?.title || '';
+  $('sg-date').value = s?.event_date || '';
+  $('sg-time').value = s?.event_time ? String(s.event_time).slice(0, 5) : '';
+  $('sg-note').value = s?.note || '';
+  $('sg-save').textContent = s ? '保存する' : '受付を開始する';
+  $('sg-modal-room').textContent = S.current.room.name + ' の固定情報に表示されます';
+  $('sg-modal').style.display = 'flex';
+}
 $('sg-save').onclick = async () => {
   const title = $('sg-title').value.trim();
   if (!title) return toast('タイトルは必須です');
-  const { error } = await supa.from('signups').insert({
-    room_id: S.current.room.id,
+  const row = {
     title,
     event_date: $('sg-date').value || null,
+    event_time: $('sg-time').value || null,      // 「20:00」の形の文字列
     note: $('sg-note').value.trim() || null,
-    created_by: S.user.id,
-  });
-  if (error) return toast('追加に失敗しました：' + error.message);
+  };
+  const edit = S.editingSignup;
+  const { error } = edit
+    ? await supa.from('signups').update(row).eq('id', edit.id)
+    : await supa.from('signups').insert({ ...row, room_id: S.current.room.id, created_by: S.user.id });
+  if (error) return toast((edit ? '保存' : '追加') + 'に失敗しました：' + error.message);
+  S.editingSignup = null;
   $('sg-modal').style.display = 'none';
-  toast('受付を開始しました');
-  renderPinned();
+  toast(edit ? '直しました' : '受付を開始しました');
+  repaintPinned();
 };
 
 function openToolModal(t){
