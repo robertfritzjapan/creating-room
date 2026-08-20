@@ -551,25 +551,29 @@ details.sec-more .sec-body{font-size:13.5px;line-height:1.9;margin-top:8px;
   <div class="modal" onclick="event.stopPropagation()" style="max-width:460px">
     <h3>基本情報を編集</h3>
     <p class="sub" id="info-modal-room"></p>
-    <label class="form-label">Zoom Meeting ID</label>
-    <input class="form-input" id="inf-zoom-id" placeholder="例：846 0238 4284">
-    <label class="form-label">Zoom Passcode</label>
-    <input class="form-input" id="inf-zoom-pass" placeholder="例：373668">
-    <label class="form-label">ZoomリンクURL</label>
-    <input class="form-input" id="inf-zoom-url" placeholder="https://…zoom.us/j/…">
-    <label class="form-label">コンタクト（1行に1件、「名目：宛先」の形で）</label>
-    <textarea class="form-input" id="inf-contacts" rows="3" placeholder="個人セッションレポート：support@robertfritzjapan.com"></textarea>
-    <label class="form-label">スケジュールの見出し</label>
-    <input class="form-input" id="inf-sched-title" placeholder="例：2025年11月–2026年10月 スケジュール">
-    <label class="form-label">スケジュール（1行に1件）</label>
-    <textarea class="form-input" id="inf-sched" rows="4"></textarea>
-    <label class="form-label">補足メモ</label>
-    <textarea class="form-input" id="inf-note" rows="2"></textarea>
+    <div class="inf-full">
+      <label class="form-label">Zoom Meeting ID</label>
+      <input class="form-input" id="inf-zoom-id" placeholder="例：846 0238 4284">
+      <label class="form-label">Zoom Passcode</label>
+      <input class="form-input" id="inf-zoom-pass" placeholder="例：373668">
+      <label class="form-label">ZoomリンクURL</label>
+      <input class="form-input" id="inf-zoom-url" placeholder="https://…zoom.us/j/…">
+      <label class="form-label">コンタクト（1行に1件、「名目：宛先」の形で）</label>
+      <textarea class="form-input" id="inf-contacts" rows="3" placeholder="個人セッションレポート：support@robertfritzjapan.com"></textarea>
+      <label class="form-label">スケジュールの見出し</label>
+      <input class="form-input" id="inf-sched-title" placeholder="例：2025年11月–2026年10月 スケジュール">
+      <label class="form-label">スケジュール（1行に1件）</label>
+      <textarea class="form-input" id="inf-sched" rows="4"></textarea>
+      <label class="form-label">補足メモ</label>
+      <textarea class="form-input" id="inf-note" rows="2"></textarea>
+    </div>
     <label class="form-label">受付の見出し（任意）</label>
     <input class="form-input" id="inf-sgtitle" placeholder="空欄なら「参加希望の受付」　例：ミニレクチャー参加の受付">
-    <label class="form-label">GoogleカレンダーID（任意・複数可）</label>
-    <textarea class="form-input" id="inf-gcal" rows="2" placeholder="1行に1つ　例：xxxxx@group.calendar.google.com"></textarea>
-    <p class="sub" style="margin-top:4px">このルームの固定情報にカレンダーを埋め込みます。複数入れると重ねて表示されます。各カレンダーは「一般公開」設定が必要です。</p>
+    <div class="inf-full">
+      <label class="form-label">GoogleカレンダーID（任意・複数可）</label>
+      <textarea class="form-input" id="inf-gcal" rows="2" placeholder="1行に1つ　例：xxxxx@group.calendar.google.com"></textarea>
+      <p class="sub" style="margin-top:4px">このルームの固定情報にカレンダーを埋め込みます。複数入れると重ねて表示されます。各カレンダーは「一般公開」設定が必要です。</p>
+    </div>
     <div style="margin-top:20px"><button class="primary-btn" id="info-save">保存する</button></div>
   </div>
 </div>
@@ -1403,8 +1407,8 @@ async function savePinned(pinned){
 
 /* ===== 基本情報の編集 ===== */
 function openInfoModal(){
-  const p = S.current.room.pinned || {};
-  $('info-modal-room').textContent = S.current.room.name;
+  const room = S.current.room;
+  const p = room.pinned || {};
   $('inf-zoom-id').value = p.zoom?.meeting_id || '';
   $('inf-zoom-pass').value = p.zoom?.passcode || '';
   $('inf-zoom-url').value = p.zoom?.url || '';
@@ -1413,12 +1417,23 @@ function openInfoModal(){
   $('inf-sched').value = (p.schedule || []).join('\n');
   $('inf-note').value = p.note || '';
   $('inf-sgtitle').value = p.signup_title || '';
+  // 道具の部屋（今日をつくる）は、画面に出るものだけ編集できるようにする
+  const simple = room.kind === 'tool';
+  document.querySelectorAll('#info-modal .inf-full').forEach(el => el.style.display = simple ? 'none' : '');
+  $('info-modal-room').textContent = room.name + (simple ? '　このタブに出るのは、受付とセクションだけです' : '');
   $('inf-gcal').value = (Array.isArray(p.gcal) ? p.gcal : [p.gcal]).filter(Boolean).join('\n');
   $('info-modal').style.display = 'flex';
 }
 $('info-modal').onclick = () => $('info-modal').style.display = 'none';
 $('info-save').onclick = async () => {
   const pinned = structuredClone(S.current.room.pinned || {});
+  if (S.current.room.kind === 'tool') {          // 道具の部屋は、画面に出るものだけ持つ。使わない値は残さない
+    ['zoom','contacts','schedule','schedule_title','note','gcal'].forEach(k => delete pinned[k]);
+    pinned.signup_title = $('inf-sgtitle').value.trim();
+    if (!pinned.signup_title) delete pinned.signup_title;
+    if (await savePinned(pinned)) { $('info-modal').style.display = 'none'; toast('保存しました'); repaintPinned(); }
+    return;
+  }
   const zid = $('inf-zoom-id').value.trim(), zpass = $('inf-zoom-pass').value.trim(), zurl = $('inf-zoom-url').value.trim();
   pinned.zoom = (zid || zpass || zurl) ? { meeting_id: zid, passcode: zpass, url: zurl } : undefined;
   pinned.contacts = $('inf-contacts').value.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
