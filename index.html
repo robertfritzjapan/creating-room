@@ -142,10 +142,6 @@ a{color:var(--ai)}
 .res-item:last-child{border:none}
 .res-del{margin-left:auto;background:none;border:none;color:var(--gray);font-size:14px;cursor:pointer;padding:6px;flex-shrink:0}
 .res-del:hover{color:var(--ai)}
-.res-del:disabled{opacity:.25;cursor:default}
-.res-del.mv{margin-left:0;font-size:12px;padding:6px 4px}
-.video-embed{position:relative;width:100%;max-width:720px;aspect-ratio:16/9;margin:10px 0;border-radius:10px;overflow:hidden;background:#000}
-.video-embed iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 .add-res-btn{display:inline-block;background:var(--white);border:1px dashed var(--gray);border-radius:20px;padding:8px 20px;font-size:13px;color:var(--gray);cursor:pointer;margin-bottom:16px}
 .add-res-btn:hover{border-color:var(--ai);color:var(--ai)}
 .form-label{display:block;font-size:13px;color:var(--gray);margin:12px 0 4px}
@@ -408,6 +404,43 @@ a{color:var(--ai)}
   .vid-att{white-space:normal;word-break:break-all}
   .res-item{flex-wrap:wrap}
 }
+
+/* ===== Creatingノート（はじめかたの中のタブ） ===== */
+.cn-date{font-size:12.5px;color:var(--gray);margin-top:-4px}
+.cn-priv{font-size:11.5px;color:var(--gray);margin-top:8px}
+.cn-block{margin-top:20px}
+.cn-q{font-size:14px;font-weight:400;line-height:1.7;margin-bottom:5px;color:#3a3a3e}
+.cn-hint{font-size:12px;color:var(--gray);line-height:1.75;margin-bottom:7px}
+.cn-ta{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 13px;
+  font-size:15px;font-family:inherit;line-height:1.8;outline:none;resize:vertical;
+  min-height:64px;background:#fff;color:var(--ink)}
+.cn-ta:focus{border-color:var(--ai)}
+.cn-ta::placeholder,.cn-min::placeholder{color:#b8b4b0}
+.cn-yest{background:#faf8f7;border:1px solid var(--line);border-left:3px solid var(--ai);
+  border-radius:0 8px 8px 0;padding:14px 16px;margin-top:16px}
+.cn-step{font-family:'Shippori Mincho',serif;font-size:15.5px;font-weight:600;line-height:1.5;margin-bottom:5px}
+.cn-step i{display:block;font-style:normal;font-family:'Noto Sans JP',sans-serif;
+  font-size:10.5px;font-weight:700;letter-spacing:.14em;color:var(--ai);margin-bottom:2px}
+.cn-label{font-size:11.5px;color:var(--gray);line-height:1.7}
+.cn-goal{font-size:14.5px;line-height:1.8;margin:4px 0 14px;white-space:pre-wrap}
+.cn-first{background:#faf8f7;border:1px solid var(--line);border-radius:8px;
+  padding:12px 14px;margin-top:16px;font-size:12.5px;color:var(--gray);line-height:1.8}
+.cn-tension{background:#faf8f7;border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+.cn-tension .cn-hint{margin-bottom:0}
+.cn-act{display:flex;gap:8px;align-items:flex-start;margin-bottom:8px}
+.cn-act .cn-ta{min-height:46px;flex:1}
+.cn-min{width:76px;flex:0 0 76px;border:1px solid var(--line);border-radius:8px;
+  padding:12px 6px;font-size:14px;font-family:inherit;text-align:center;outline:none;background:#fff}
+.cn-min:focus{border-color:var(--ai)}
+.cn-bar{display:flex;gap:10px;margin-top:22px;flex-wrap:wrap}
+.cn-bar button{flex:1;min-width:150px;margin:0}
+.cn-saveinfo{font-size:11.5px;color:var(--gray);margin-top:10px;text-align:right;min-height:17px}
+.cn-foot{font-size:12px;color:var(--gray);line-height:1.9;margin-top:16px;
+  border-top:1px solid var(--line);padding-top:14px}
+.cn-details summary{font-size:13.5px;color:var(--gray);cursor:pointer;padding:2px 0}
+.cn-past{border-top:1px solid var(--line);margin-top:10px;padding:12px 0;font-size:13.5px;line-height:1.8}
+.cn-past b{font-weight:600;font-size:13px}
+.cn-past div{white-space:pre-wrap}
 </style>
 </head>
 <body>
@@ -923,9 +956,8 @@ function openRoom(room){
   $('room-title').textContent = t(room.name);
   updatePinBtn();
   // はじめかた（entrance）は固定情報とリソースだけ。他の部屋は従来どおり
-  const noteRoom = S.rooms.find(r => r.kind === 'tool' && /Creatingノート/.test(r.name || ''));
   const tabs = room.slug === 'entrance'
-    ? [['pinned','固定情報'],['chat','質問'], ...(noteRoom ? [['note','Creatingノート']] : []), ['resources','リソース']]
+    ? [['pinned','固定情報'],['chat','質問'],['note','Creatingノート'],['resources','リソース']]
     : (room.kind === 'tool' || navGroupOf(room) === 'continue')   // 道具と「つくり続ける」の部屋は単発なのでクラス記録なし
     ? [['pinned','固定情報'],['chat','質問'],['resources','リソース']]
     : [['pinned','固定情報'],['archive','クラス記録'],['chat','質問'],['resources','リソース']];
@@ -946,7 +978,8 @@ function showTab(tab){
   if (S.current.host) { S.current = { type:'room', room: S.current.host }; }
   if (tab === 'note') {
     const noteRoom = S.rooms.find(r => r.kind === 'tool' && /Creatingノート/.test(r.name || ''));
-    if (noteRoom) { S.current = { type:'room', room: noteRoom, host: S.current.room }; renderPinned(); }
+    if (noteRoom) S.current = { type:'room', room: noteRoom, host: S.current.room };
+    renderNote(!!noteRoom);
     return;
   }
   ({pinned:renderPinned, archive:renderArchive, chat:renderChat, resources:renderResources, members:renderMembers})[tab]();
@@ -975,27 +1008,147 @@ function fileHref(a){
     : a.url;
 }
 
-/* ===== 固定情報 ===== */
-// YouTube / Vimeo の URL だけの行 → 埋め込みプレーヤーの src。該当しなければ null
-function videoEmbedSrc(l){
-  let m;
-  if ((m = l.match(/^https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{6,})/)))
-    return `https://www.youtube.com/embed/${m[1]}`;
-  if ((m = l.match(/^https?:\/\/(?:www\.)?vimeo\.com\/(?:video\/)?(\d+)(?:\/([\da-f]+))?/)))
-    return `https://player.vimeo.com/video/${m[1]}${m[2] ? `?h=${m[2]}` : ''}`;
-  if ((m = l.match(/^https?:\/\/player\.vimeo\.com\/video\/(\d+)(\?[^\s]*)?/)))
-    return `https://player.vimeo.com/video/${m[1]}${m[2] || ''}`;
-  return null;
+/* ============================================================
+   Creatingノート（はじめかたの中のタブ）
+   書いたものは、この端末の localStorage にだけ残る。サーバーには送らない。
+   creatingnote.html（単体版）と同じキーを使うので、行き来しても続きが読める。
+   ============================================================ */
+const CN_KEY = 'creating-note-v1';
+const CN_WD = ['日','月','火','水','木','金','土'];
+const cnLoad = () => { try { return JSON.parse(localStorage.getItem(CN_KEY)) || {}; } catch (e) { return {}; } };
+const cnStore = d => { try { localStorage.setItem(CN_KEY, JSON.stringify(d)); return true; } catch (e) { return false; } };
+const cnPad = n => String(n).padStart(2, '0');
+const cnKeyOf = d => d.getFullYear() + '-' + cnPad(d.getMonth() + 1) + '-' + cnPad(d.getDate());
+const cnJDate = k => { const [, m, dd] = k.split('-'); return `${Number(m)}月${Number(dd)}日`; };
+const cnJDateW = k => { const [y, m, dd] = k.split('-').map(Number); return `${m}月${dd}日（${CN_WD[new Date(y, m - 1, dd).getDay()]}）`; };
+function cnEntryText(k, e){
+  let s = `【${cnJDate(k)}】\n`;
+  if (e.reflect) s += `きのう：${e.reflect}\n`;
+  if (e.goal)    s += `望む成果：${e.goal}\n`;
+  if (e.reality) s += `いまの現実：${e.reality}\n`;
+  if (e.actions?.length) s += '今日すること：\n' + e.actions.map(a => `・${a.text}${a.min ? `（${a.min}分）` : ''}`).join('\n') + '\n';
+  return s;
 }
+async function renderNote(hasRoom){
+  const page = $('page');
+  page.innerHTML = '';
+  if (hasRoom) {
+    try { await renderPinned(); } catch (e) { page.innerHTML = ''; }
+    if (S.tab !== 'note') return;                                  // 読み込み中にタブが変わっていたら描かない
+    const only = page.children.length === 1 ? page.querySelector('.empty') : null;
+    if (only && /固定情報はまだありません/.test(only.textContent)) page.innerHTML = '';   // 空の見出しは出さない
+  }
+
+  const data = cnLoad();
+  const now = new Date();
+  const todayKey = cnKeyOf(now);
+  const pastKeys = Object.keys(data).filter(k => k < todayKey).sort();
+  const lastKey = pastKeys[pastKeys.length - 1];
+  const dayNo = pastKeys.length + 1;
+  const today = data[todayKey] || {};
+  const acts = today.actions || [];
+  const actRow = i => `<div class="cn-act">
+      <textarea class="cn-ta cn-act-t" rows="1" placeholder="${i + 1}.">${esc(acts[i]?.text || '')}</textarea>
+      <input class="cn-min cn-act-m" inputmode="numeric" placeholder="分" value="${esc(acts[i]?.min || '')}">
+    </div>`;
+  const yest = lastKey && data[lastKey]?.goal ? `
+    <div class="cn-yest">
+      <div class="cn-step"><i>ステップ0</i>きのうのふりかえり</div>
+      <div class="cn-label">前に書いた日 ${esc(cnJDateW(lastKey))} に望んだ成果が、ここに出ます。</div>
+      <div class="cn-goal">${esc(data[lastKey].goal)}</div>
+      <div class="cn-q">どんな1日でしたか。望んだ成果はどうなりましたか。</div>
+      <div class="cn-hint">例：終わらなかった。見積もりが30分甘かった／やったけれど、望んでいたことには近づかなかった／急な用事で流れた／できた。思ったより早く終わった</div>
+      <textarea class="cn-ta" id="cn-reflect" placeholder="自由に。2〜4行">${esc(today.reflect || '')}</textarea>
+    </div>` : `
+    <div class="cn-first">
+      今日が最初のページです。明日からは、ここに前に書いた日の望む成果が出て、ふりかえりを書けるようになります。
+    </div>`;
+
+  page.insertAdjacentHTML('afterbegin', `
+    <div class="card">
+      <h3><span class="bar"></span>今日のページ<span class="muted" style="margin-left:auto;font-weight:400">Day ${dayNo}</span></h3>
+      <div class="cn-date">${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日（${CN_WD[now.getDay()]}）</div>
+      <p class="cn-priv">書いたものは、この端末の中にだけ残ります。どこにも送られません。</p>
+      ${yest}
+      <div class="cn-block">
+        <div class="cn-step"><i>ステップ1</i>今日の望む成果</div>
+        <div class="cn-q">今日が終わったとき、どうなっていたらいいですか。</div>
+        <textarea class="cn-ta" id="cn-goal" placeholder="1〜2行">${esc(today.goal || '')}</textarea>
+      </div>
+      <div class="cn-block">
+        <div class="cn-step"><i>ステップ2</i>いまの現実</div>
+        <div class="cn-q">そこから見て、いまはどうですか。</div>
+        <div class="cn-hint">良い悪いは抜きで、そのまま。</div>
+        <textarea class="cn-ta" id="cn-reality" placeholder="1〜2行">${esc(today.reality || '')}</textarea>
+      </div>
+      <div class="cn-block cn-tension">
+        <div class="cn-step"><i>ステップ3</i>そのあいだにあるもの</div>
+        <div class="cn-hint">望む成果と、いまの現実。ふたつのあいだにあるものを、ひと呼吸、感じてから次へ。ここは書かなくてかまいません。</div>
+      </div>
+      <div class="cn-block">
+        <div class="cn-step"><i>ステップ4</i>今日のアクション</div>
+        <div class="cn-q">差を解消するために、今日すること。</div>
+        <div class="cn-hint">1〜3個。かかる時間も書いておくと、明日ふり返るときに効きます。</div>
+        ${[0,1,2].map(actRow).join('')}
+      </div>
+      <div class="cn-bar">
+        <button class="add-res-btn" id="cn-copy">全部をコピー</button>
+        <button class="primary-btn" id="cn-done">今日はここまで</button>
+      </div>
+      <div class="cn-saveinfo" id="cn-saved">書いたものは自動で保存されます</div>
+      <div class="cn-foot">
+        書けなかった日も、いまの現実のひとつです。飛ばしたまま、次の日へ進んでください。<br>
+        この端末のブラウザにだけ保存されます。履歴やサイトデータを消すと、ノートも消えます。
+      </div>
+    </div>
+    ${pastKeys.length ? `<div class="card">
+      <details class="cn-details"><summary>これまでのページ（${pastKeys.length}日）</summary>
+        ${pastKeys.slice().reverse().map(k => {
+          const e = data[k];
+          return `<div class="cn-past"><b>${esc(cnJDate(k))}</b><div>${esc(cnEntryText(k, e).split('\n').slice(1).join('\n').trim())}</div></div>`;
+        }).join('')}
+      </details>
+    </div>` : ''}`);
+
+  const grow = ta => { ta.style.height = 'auto'; ta.style.height = Math.max(46, ta.scrollHeight + 2) + 'px'; };
+  const actT = [...page.querySelectorAll('.cn-act-t')], actM = [...page.querySelectorAll('.cn-act-m')];
+  const val = id => $(id) ? $(id).value : '';
+  let timer = null;
+  function save(quiet){
+    const entry = {
+      reflect: val('cn-reflect'), goal: val('cn-goal'), reality: val('cn-reality'),
+      actions: actT.map((a, i) => ({ text: a.value.trim(), min: actM[i].value.trim() })).filter(a => a.text),
+      ts: Date.now(),
+    };
+    const empty = !entry.reflect && !entry.goal && !entry.reality && !entry.actions.length;
+    if (empty) delete data[todayKey]; else data[todayKey] = entry;
+    const ok = cnStore(data);
+    const el = $('cn-saved');
+    if (el) el.textContent = ok ? (quiet ? '保存しました' : '保存しました ' + new Date().toLocaleTimeString('ja-JP', { ...JST, hour:'2-digit', minute:'2-digit' }))
+                                : 'この端末に保存できませんでした（プライベートブラウズかもしれません）';
+    return ok;
+  }
+  page.querySelectorAll('.cn-ta, .cn-min').forEach(el => {
+    if (el.tagName === 'TEXTAREA') grow(el);
+    el.addEventListener('input', () => {
+      if (el.tagName === 'TEXTAREA') grow(el);
+      clearTimeout(timer); timer = setTimeout(() => save(true), 500);
+    });
+  });
+  $('cn-done').onclick = () => { clearTimeout(timer); if (save(true)) toast('保存しました。また明日。'); };
+  $('cn-copy').onclick = async () => {
+    clearTimeout(timer); save(true);
+    const keys = Object.keys(data).sort();
+    if (!keys.length) return toast('まだ書いたページがありません');
+    const text = 'Creatingノート\n\n' + keys.map(k => cnEntryText(k, data[k])).join('\n');
+    try { await navigator.clipboard.writeText(text); toast('コピーしました'); }
+    catch (e) { window.prompt('長押し（または Ctrl+C）でコピーしてください', text); }
+  };
+}
+
+/* ===== 固定情報 ===== */
 function richText(t){
-  return (t || '').split('\n').map(rawLine => {
-    // 動画判定はエスケープ前の生の行で（& が &amp; になる前）
-    const raw = rawLine.trim();
-    const vsrc = /^https?:\/\/\S+$/.test(raw) ? videoEmbedSrc(raw) : null;
-    if (vsrc) {
-      return `<div class="video-embed"><iframe src="${esc(vsrc)}" loading="lazy" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen title="video"></iframe></div>`;
-    }
-    const line = esc(rawLine);
+  return esc(t || '').split('\n').map(line => {
     const l = line.trim();
     if (/^https?:\/\/\S+$/.test(l) &&
         (/\.(png|jpe?g|gif|webp|svg)(\?|#|$)/i.test(l) || l.includes('/room-media/'))) {
@@ -1072,10 +1225,9 @@ async function renderPinned(){
       <div class="gcal-wrap"><iframe src="${gsrc}" loading="lazy" title="ルームカレンダー"></iframe></div>
     </div>`;
   }
-  const secN = (p.sections || []).length;
   (p.sections || []).forEach((s, idx) => {
     const btns = editor
-      ? `<span style="margin-left:auto;flex-shrink:0;display:flex;align-items:center"><button class="res-del mv" data-smove="${idx}:-1" title="上へ" ${idx === 0 ? 'disabled' : ''}>▲</button><button class="res-del mv" data-smove="${idx}:1" title="下へ" ${idx === secN - 1 ? 'disabled' : ''}>▼</button><button class="res-del" data-sedit="${idx}" title="編集">✏️</button><button class="res-del" data-sdel="${idx}" title="削除">✕</button></span>`
+      ? `<span style="margin-left:auto;flex-shrink:0"><button class="res-del" data-sedit="${idx}" title="編集">✏️</button><button class="res-del" data-sdel="${idx}" title="削除">✕</button></span>`
       : '';
     h += `<div class="card">
       <h3><span class="bar"></span>${esc(s.title || '')}${btns}</h3>
@@ -1087,7 +1239,7 @@ async function renderPinned(){
   const as = $('add-sec'); if (as) as.onclick = () => openSecModal(null);
   const asg = $('add-signup'); if (asg) asg.onclick = () => {
     ['sg-title','sg-date','sg-note'].forEach(id => $(id).value = '');
-    $('sg-modal-room').textContent = S.current.room.name + (S.current.room.kind === 'tool' ? ' （はじめかた › Creatingノート）に表示されます' : ' の固定情報に表示されます');
+    $('sg-modal-room').textContent = S.current.room.name + ' の固定情報に表示されます';
     $('sg-modal').style.display = 'flex';
   };
   $('page').querySelectorAll('[data-sg-join]').forEach(el => el.onclick = async () => {
@@ -1109,15 +1261,6 @@ async function renderPinned(){
     if (error) return toast('削除に失敗しました：' + error.message);
     toast('受付を削除しました');
     renderPinned();
-  });
-  $('page').querySelectorAll('[data-smove]').forEach(el => el.onclick = async () => {
-    const [i, d] = el.dataset.smove.split(':').map(Number);
-    const pinned = structuredClone(S.current.room.pinned || {});
-    const arr = pinned.sections || [];
-    const j = i + d;
-    if (j < 0 || j >= arr.length) return;
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-    if (await savePinned(pinned)) renderPinned();
   });
   $('page').querySelectorAll('[data-sedit]').forEach(el => el.onclick = () => openSecModal(Number(el.dataset.sedit)));
   $('page').querySelectorAll('[data-sdel]').forEach(el => el.onclick = async () => {
@@ -1478,10 +1621,9 @@ async function renderResources(){
   } else {
     const groups = {};
     resData.forEach(r => (groups[r.category] = groups[r.category] || []).push(r));
-    const catList = Object.keys(groups);   // 出現順＝sort_order 順。並べ替えると保存時に振り直す
-    resSection = addBtn + Object.entries(groups).map(([cat, items], ci) => `
-      <div class="card"><h3><span class="bar"></span>${esc(cat)}${isEditor ? `<span style="margin-left:auto;flex-shrink:0;display:flex;align-items:center"><button class="res-del mv" data-cmove="${ci}:-1" title="この分類を上へ" ${ci === 0 ? 'disabled' : ''}>▲</button><button class="res-del mv" data-cmove="${ci}:1" title="この分類を下へ" ${ci === catList.length - 1 ? 'disabled' : ''}>▼</button></span>` : ''}</h3>
-        ${items.map((r, ri) => `
+    resSection = addBtn + Object.entries(groups).map(([cat, items]) => `
+      <div class="card"><h3><span class="bar"></span>${esc(cat)}</h3>
+        ${items.map(r => `
           ${(() => {
             const atts = (r.attachments && r.attachments.length) ? r.attachments
               : (r.file_url ? [{ name: r.file_name || 'ファイル', url: r.file_url }] : []);
@@ -1493,11 +1635,9 @@ async function renderResources(){
             ${atts.length ? `<div class="vid-atts" style="margin-top:5px">${atts.map(a =>
               `<a class="vid-att" href="${esc(fileHref(a))}" target="_blank" rel="noopener">📎 ${esc(a.name)}</a>`).join('')}</div>` : ''}</div>`;
           })()}
-            ${isEditor ? `<span style="margin-left:auto;flex-shrink:0;display:flex;align-items:center"><button class="res-del mv" data-rmove="${r.id}:-1" title="上へ" ${ri === 0 ? 'disabled' : ''}>▲</button><button class="res-del mv" data-rmove="${r.id}:1" title="下へ" ${ri === items.length - 1 ? 'disabled' : ''}>▼</button><button class="res-del" data-redit="${r.id}" title="編集">✏️</button><button class="res-del" data-del="${r.id}" title="削除">✕</button></span>` : ''}
+            ${isEditor ? `<button class="res-del" data-redit="${r.id}" title="編集">✏️</button><button class="res-del" data-del="${r.id}" title="削除">✕</button>` : ''}
           </div>`).join('')}
       </div>`).join('');
-    S.resGroups = groups;
-    S.resCatList = catList;
   }
 
   $('page').innerHTML = resSection + toolSection;
@@ -1543,41 +1683,6 @@ async function renderResources(){
 
   const ab = $('add-res');
   if (ab) ab.onclick = () => openResModal(null);
-  // 並べ替え：分類の順（cmove）とアイテムの順（rmove）。保存時に部屋内の sort_order を 10,20,30… で振り直す
-  async function saveResOrder(orderedGroups){
-    const flat = orderedGroups.flat();
-    const updates = flat.map((r, i) => ({ id: r.id, sort_order: (i + 1) * 10 })).filter(u => {
-      const cur = flat.find(r => r.id === u.id); return cur.sort_order !== u.sort_order;
-    });
-    const results = await Promise.all(updates.map(u => supa.from('resources').update({ sort_order: u.sort_order }).eq('id', u.id)));
-    const bad = results.find(x => x.error);
-    if (bad) return toast('並べ替えの保存に失敗しました：' + bad.error.message);
-    renderResources();
-  }
-  $('page').querySelectorAll('[data-cmove]').forEach(el => el.onclick = e => {
-    e.preventDefault(); e.stopPropagation();
-    const [ci, d] = el.dataset.cmove.split(':').map(Number);
-    const cats = [...(S.resCatList || [])];
-    const j = ci + d;
-    if (j < 0 || j >= cats.length) return;
-    [cats[ci], cats[j]] = [cats[j], cats[ci]];
-    saveResOrder(cats.map(c => S.resGroups[c]));
-  });
-  $('page').querySelectorAll('[data-rmove]').forEach(el => el.onclick = e => {
-    e.preventDefault(); e.stopPropagation();
-    const [id, dStr] = el.dataset.rmove.split(':'); const d = Number(dStr);
-    const cats = S.resCatList || [];
-    const groupsCopy = cats.map(c => [...S.resGroups[c]]);
-    for (const items of groupsCopy) {
-      const i = items.findIndex(r => r.id === id);
-      if (i < 0) continue;
-      const j = i + d;
-      if (j < 0 || j >= items.length) return;
-      [items[i], items[j]] = [items[j], items[i]];
-      break;
-    }
-    saveResOrder(groupsCopy);
-  });
   $('page').querySelectorAll('[data-open]').forEach(el => el.onclick = e => {
     if (e.target.closest('a, button')) return;
     window.open(el.dataset.open, '_blank', 'noopener');
@@ -1811,7 +1916,7 @@ $('res-save').onclick = async () => {
   };
   const q = S.editingRes
     ? supa.from('resources').update(row).eq('id', S.editingRes.id)
-    : supa.from('resources').insert({ ...row, room_id: S.current.room.id, sort_order: Math.max(100, ...(S.resCache || []).map(r => r.sort_order || 0)) + 10 });   // 末尾に追加
+    : supa.from('resources').insert({ ...row, room_id: S.current.room.id, sort_order: 100 });
   const { error } = await q;
   if (error) return toast('保存に失敗しました：' + error.message);
   $('res-modal').style.display = 'none';
