@@ -455,7 +455,9 @@ details.sec-more > summary::after{content:'＋';font-size:13px}
 details.sec-more[open] > summary::after{content:'−'}
 details.sec-more .sec-body{font-size:13.5px;line-height:1.9;margin-top:8px;
   border-top:1px solid var(--line);padding-top:12px}
-.sec-tools{margin-top:12px;display:flex;gap:6px}
+.sec-tools{margin-top:14px;display:flex;gap:4px;justify-content:flex-end;
+  border-top:1px solid var(--line);padding-top:10px}
+.sec-tools .res-del{margin-left:0}
 /* セクション本文の中の「コピーできる枠」（--- ではさむ） */
 .copybox{border:1px solid var(--line);border-radius:8px;background:#fbfaf9;margin:12px 0}
 .copybox pre{margin:0;padding:14px 16px;max-height:280px;overflow:auto;white-space:pre-wrap;
@@ -1157,9 +1159,13 @@ async function renderNote(hasRoom){
 
   // ノート本体は、1枚目のカード（緊張構造チャート）の中に入れる。
   // セクションがまだ作られていないときは、単独のカードとして出す。
-  const host = page.querySelector('.sec-card');
+  const host = page.querySelector('.sec-card.cn-host')
+    || [...page.querySelectorAll('.sec-card')].find(c => /チャート/.test(c.querySelector('h3')?.textContent || ''))
+    || page.querySelector('.sec-card');
   if (host) {
     host.insertAdjacentHTML('beforeend', `<div class="cn-form">${formHtml}</div>`);
+    const tools = host.querySelector('.sec-tools');
+    if (tools) host.append(tools);                 // 編集ボタンはカードのいちばん下へ
     // チャートは一番上。参加希望の受付や Zoom より先に出す（編集者のツールバーだけ上に残す）
     const bar = page.firstElementChild?.querySelector?.('#edit-info') ? page.firstElementChild : null;
     if (bar) bar.after(host); else page.prepend(host);
@@ -1276,15 +1282,17 @@ async function renderPinned(opts = {}){
       <button class="add-res-btn" style="margin-bottom:0" id="edit-info">✏️ 基本情報を編集</button>
       <button class="add-res-btn" style="margin-bottom:0" id="add-sec">＋ セクションを追加</button>
     </div>` : '';
+  // 「今日をつくる」のタブは、チャート・受付・セクションだけにする。
+  // Zoom・コンタクト・スケジュール・カレンダーは、部屋の固定情報としては残るが、このタブには出さない。
   const half = [];
-  if (p.zoom && (p.zoom.meeting_id || p.zoom.url)) {
+  if (!fold && p.zoom && (p.zoom.meeting_id || p.zoom.url)) {
     half.push(`<div class="card"><h3><span class="bar"></span>Zoom</h3>
       ${p.zoom.meeting_id ? `<div class="kv"><b>Meeting ID</b>${esc(p.zoom.meeting_id)}</div>` : ''}
       ${p.zoom.passcode ? `<div class="kv"><b>Passcode</b>${esc(p.zoom.passcode)}</div>` : ''}
       ${p.zoom.url ? `<a class="zoom-btn" href="${esc(p.zoom.url)}" target="_blank" rel="noopener">${t('Zoomに参加する')}</a>` : ''}
     </div>`);
   }
-  if (p.contacts?.length) {
+  if (!fold && p.contacts?.length) {
     half.push(`<div class="card"><h3><span class="bar"></span>${t('コンタクト')}</h3>
       ${p.contacts.map(c => `<div class="kv"><b>${esc(c.label)}</b>${esc(c.value)}</div>`).join('')}
     </div>`);
@@ -1306,15 +1314,15 @@ async function renderPinned(opts = {}){
     </div>`;
   }
   if (half.length) h += `<div class="info-grid">${half.join('')}</div>`;
-  if (p.schedule?.length) {
+  if (!fold && p.schedule?.length) {
     h += `<div class="card"><h3><span class="bar"></span>${esc(p.schedule_title || 'スケジュール')}</h3>
       <ul class="sched">${p.schedule.map(s => `<li>${esc(s)}</li>`).join('')}</ul>
       ${p.note ? `<p class="muted" style="margin-top:10px">${esc(p.note)}</p>` : ''}
     </div>`;
-  } else if (p.note) {
+  } else if (!fold && p.note) {
     h += `<div class="card"><p style="font-size:13px">${esc(p.note)}</p></div>`;
   }
-  const gcalIds = (Array.isArray(p.gcal) ? p.gcal : [p.gcal]).filter(Boolean);
+  const gcalIds = fold ? [] : (Array.isArray(p.gcal) ? p.gcal : [p.gcal]).filter(Boolean);
   if (gcalIds.length) {
     const gmode = window.innerWidth < 600 ? 'AGENDA' : 'MONTH';
     const gsrc = 'https://calendar.google.com/calendar/embed?'
@@ -1327,11 +1335,12 @@ async function renderPinned(opts = {}){
   (p.sections || []).forEach((s, idx) => {
     if (fold) {
       // Creatingノートのタブ：本文の1行目だけをカードに出し、残りは「くわしく」の中に畳む
-      const lines = (s.body || '').split('\n');
+      const lines = (s.body || '').split('\n').filter(l => l.trim() !== '[チャート]');
+      const isHost = /^\s*\[チャート\]\s*$/m.test(s.body || '');
       const i0 = lines.findIndex(l => l.trim());
       const lead = i0 >= 0 ? lines[i0] : '';
       const rest = i0 >= 0 ? lines.slice(i0 + 1).join('\n').replace(/^\s*\n/, '') : '';
-      h += `<div class="card sec-card" data-sec="${idx}">
+      h += `<div class="card sec-card${isHost ? ' cn-host' : ''}" data-sec="${idx}">
         <h3><span class="bar"></span>${esc(s.title || '')}</h3>
         ${lead ? `<div class="sec-lead">${richText(lead)}</div>` : ''}
         ${rest.trim() ? `<details class="sec-more"><summary>くわしく</summary>
