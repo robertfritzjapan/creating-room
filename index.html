@@ -406,27 +406,64 @@ a{color:var(--ai)}
 }
 
 /* ===== Creatingノート（はじめかたの中のタブ） ===== */
-.cn-date{font-size:12.5px;color:var(--gray);margin-top:-4px}
-.cn-priv{font-size:11.5px;color:var(--gray);margin-top:8px}
-.cn-block{margin-top:20px}
-.cn-q{font-size:14px;font-weight:400;line-height:1.7;margin-bottom:5px;color:#3a3a3e}
-.cn-hint{font-size:12px;color:var(--gray);line-height:1.75;margin-bottom:7px}
-.cn-ta{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 13px;
+/* ===== Creatingノート：緊張構造チャート =====
+   文字は3段だけ。見出し16px（明朝）／本文14px／補助12.5px（グレー）。入力は15px。 */
+.cn-form{margin-top:16px;border-top:1px solid var(--line);padding-top:16px}
+.cn-meta{font-size:12.5px;color:var(--gray);display:flex;gap:12px;align-items:baseline;margin-bottom:14px}
+.cn-meta b{font-weight:600;color:var(--ink)}
+.cn-ta{width:100%;border:1px solid var(--line);border-radius:6px;padding:10px 12px;
   font-size:15px;font-family:inherit;line-height:1.8;outline:none;resize:vertical;
-  min-height:64px;background:#fff;color:var(--ink)}
+  min-height:60px;background:#fff;color:var(--ink)}
 .cn-ta:focus{border-color:var(--ai)}
-.cn-ta::placeholder,.cn-min::placeholder{color:#b8b4b0}
-.cn-yest{background:#faf8f7;border:1px solid var(--line);border-left:3px solid var(--ai);
-  border-radius:0 8px 8px 0;padding:14px 16px;margin-top:16px}
-.cn-step{font-family:'Shippori Mincho',serif;font-size:15.5px;font-weight:600;line-height:1.5;margin-bottom:5px}
-.cn-step i{display:block;font-style:normal;font-family:'Noto Sans JP',sans-serif;
-  font-size:10.5px;font-weight:700;letter-spacing:.14em;color:var(--ai);margin-bottom:2px}
-.cn-label{font-size:11.5px;color:var(--gray);line-height:1.7}
-.cn-goal{font-size:14.5px;line-height:1.8;margin:4px 0 14px;white-space:pre-wrap}
-.cn-first{background:#faf8f7;border:1px solid var(--line);border-radius:8px;
-  padding:12px 14px;margin-top:16px;font-size:12.5px;color:var(--gray);line-height:1.8}
-.cn-tension{background:#faf8f7;border:1px solid var(--line);border-radius:8px;padding:14px 16px}
-.cn-tension .cn-hint{margin-bottom:0}
+.cn-ta::placeholder,.cn-min::placeholder{color:#b8b4b0;font-size:12.5px}
+
+/* きのうのふりかえり（チャートの外） */
+.cn-yest{background:#faf8f7;border:1px solid var(--line);border-radius:6px;
+  padding:14px 16px;margin-bottom:16px}
+.cn-label{font-size:12.5px;color:var(--gray);line-height:1.7}
+.cn-goal{font-size:14px;line-height:1.8;margin:2px 0 10px;white-space:pre-wrap}
+.cn-first{background:#faf8f7;border:1px solid var(--line);border-radius:6px;
+  padding:12px 14px;margin-bottom:16px;font-size:12.5px;color:var(--gray);line-height:1.8}
+
+/* チャート本体。表示は 望む成果 → アクション → 今の現実。書く順（Tab）は 望む成果 → 今の現実 → アクション */
+.cs{display:flex;flex-direction:column;color:var(--ink)}
+.cs-goal{order:1}
+.cs-tent{order:2}
+.cs-mid{order:3}
+.cs-real{order:4}
+.cs-box{border:1.5px solid var(--ink);border-radius:6px;padding:14px 16px;background:#fff}
+.cs-t{font-family:'Shippori Mincho',serif;font-size:16px;font-weight:600;text-align:center;line-height:1.5}
+.cs-t i{font-style:normal;color:var(--ai);margin-right:5px}
+.cs-q{font-size:12.5px;color:var(--gray);line-height:1.7;text-align:center;margin:2px 0 10px}
+.cs-tent{display:block;width:100%;height:24px}
+.cs-mid{border-left:1.5px solid var(--ink);border-right:1.5px solid var(--ink);padding:0 16px 14px}
+.cn-act{display:flex;gap:8px;align-items:flex-start;margin-bottom:7px}
+.cn-act .cn-ta{min-height:44px;flex:1}
+.cs-no{flex:0 0 18px;text-align:center;font-size:12.5px;color:var(--gray);padding-top:12px}
+.cn-min{width:62px;flex:0 0 62px;border:1px solid var(--line);border-radius:6px;
+  padding:11px 4px;font-size:14px;font-family:inherit;text-align:center;outline:none;background:#fff}
+.cn-min:focus{border-color:var(--ai)}
+/* はじめかたの Creatingノート タブ：カードは「見出し＋1行」まで。残りは「くわしく」の中 */
+.sec-card h3{margin-bottom:7px}
+.sec-lead{font-size:14px;line-height:1.85}
+details.sec-more{margin-top:10px}
+details.sec-more > summary{list-style:none;cursor:pointer;font-size:12.5px;color:var(--ai);
+  padding:3px 0;display:inline-flex;align-items:center;gap:5px}
+details.sec-more > summary::-webkit-details-marker{display:none}
+details.sec-more > summary::after{content:'＋';font-size:13px}
+details.sec-more[open] > summary::after{content:'−'}
+details.sec-more .sec-body{font-size:13.5px;line-height:1.9;margin-top:8px;
+  border-top:1px solid var(--line);padding-top:12px}
+.sec-tools{margin-top:12px;display:flex;gap:6px}
+/* セクション本文の中の「コピーできる枠」（--- ではさむ） */
+.copybox{border:1px solid var(--line);border-radius:8px;background:#fbfaf9;margin:12px 0}
+.copybox pre{margin:0;padding:14px 16px;max-height:280px;overflow:auto;white-space:pre-wrap;
+  word-break:break-word;font-family:inherit;font-size:12.5px;line-height:1.85;color:#3a3a3e}
+.copybox .cb-bar{border-top:1px solid var(--line);padding:10px 14px;display:flex;justify-content:flex-end}
+.copybox .cb-bar button{margin:0}
+.cn-form{margin-top:18px;border-top:1px solid var(--line);padding-top:16px}
+.cn-meta{font-size:12px;color:var(--gray);display:flex;gap:12px;align-items:baseline;margin-bottom:4px}
+.cn-meta b{font-weight:600;color:var(--ink)}
 .cn-act{display:flex;gap:8px;align-items:flex-start;margin-bottom:8px}
 .cn-act .cn-ta{min-height:46px;flex:1}
 .cn-min{width:76px;flex:0 0 76px;border:1px solid var(--line);border-radius:8px;
@@ -434,11 +471,12 @@ a{color:var(--ai)}
 .cn-min:focus{border-color:var(--ai)}
 .cn-bar{display:flex;gap:10px;margin-top:22px;flex-wrap:wrap}
 .cn-bar button{flex:1;min-width:150px;margin:0}
-.cn-saveinfo{font-size:11.5px;color:var(--gray);margin-top:10px;text-align:right;min-height:17px}
-.cn-foot{font-size:12px;color:var(--gray);line-height:1.9;margin-top:16px;
+.cn-saveinfo{font-size:12.5px;color:var(--gray);margin-top:10px;text-align:right;min-height:18px}
+.cn-foot{font-size:12.5px;color:var(--gray);line-height:1.9;margin-top:16px;
   border-top:1px solid var(--line);padding-top:14px}
-.cn-details summary{font-size:13.5px;color:var(--gray);cursor:pointer;padding:2px 0}
-.cn-past{border-top:1px solid var(--line);margin-top:10px;padding:12px 0;font-size:13.5px;line-height:1.8}
+.cn-details{margin-top:14px}
+.cn-details summary{font-size:12.5px;color:var(--gray);cursor:pointer;padding:2px 0}
+.cn-past{border-top:1px solid var(--line);margin-top:10px;padding:12px 0;font-size:13.5px;line-height:1.85}
 .cn-past b{font-weight:600;font-size:13px}
 .cn-past div{white-space:pre-wrap}
 </style>
@@ -1033,7 +1071,7 @@ async function renderNote(hasRoom){
   const page = $('page');
   page.innerHTML = '';
   if (hasRoom) {
-    try { await renderPinned(); } catch (e) { page.innerHTML = ''; }
+    try { await renderPinned({ fold:true }); } catch (e) { page.innerHTML = ''; }
     if (S.tab !== 'note') return;                                  // 読み込み中にタブが変わっていたら描かない
     const only = page.children.length === 1 ? page.querySelector('.empty') : null;
     if (only && /固定情報はまだありません/.test(only.textContent)) page.innerHTML = '';   // 空の見出しは出さない
@@ -1047,49 +1085,48 @@ async function renderNote(hasRoom){
   const dayNo = pastKeys.length + 1;
   const today = data[todayKey] || {};
   const acts = today.actions || [];
-  const actRow = i => `<div class="cn-act">
-      <textarea class="cn-ta cn-act-t" rows="1" placeholder="${i + 1}.">${esc(acts[i]?.text || '')}</textarea>
-      <input class="cn-min cn-act-m" inputmode="numeric" placeholder="分" value="${esc(acts[i]?.min || '')}">
+  const CN_ROW_MAX = 20;                                   // 暴走よけ。数を決めるための上限ではない
+  const actRow = (i, a) => `<div class="cn-act">
+      <div class="cs-no">${i + 1}</div>
+      <textarea class="cn-ta cn-act-t" rows="1">${esc(a?.text || '')}</textarea>
+      <input class="cn-min cn-act-m" inputmode="numeric" placeholder="分" value="${esc(a?.min || '')}">
     </div>`;
+  const rowCount = Math.min(CN_ROW_MAX, Math.max(3, acts.length + 1));   // 書いた数＋空き1行。最低3行
   const yest = lastKey && data[lastKey]?.goal ? `
     <div class="cn-yest">
-      <div class="cn-step"><i>ステップ0</i>きのうのふりかえり</div>
-      <div class="cn-label">前に書いた日 ${esc(cnJDateW(lastKey))} に望んだ成果が、ここに出ます。</div>
+      <div class="cs-t" style="text-align:left">きのうのふりかえり</div>
+      <div class="cn-label">${esc(cnJDateW(lastKey))} に望んだ成果</div>
       <div class="cn-goal">${esc(data[lastKey].goal)}</div>
-      <div class="cn-q">どんな1日でしたか。望んだ成果はどうなりましたか。</div>
-      <div class="cn-hint">例：終わらなかった。見積もりが30分甘かった／やったけれど、望んでいたことには近づかなかった／急な用事で流れた／できた。思ったより早く終わった</div>
-      <textarea class="cn-ta" id="cn-reflect" placeholder="自由に。2〜4行">${esc(today.reflect || '')}</textarea>
+      <div class="cn-label" style="margin-bottom:6px">望んだ成果は、どうなりましたか。</div>
+      <textarea class="cn-ta" id="cn-reflect" placeholder="例：見積もりが30分甘かった／急な用事で流れた／できた">${esc(today.reflect || '')}</textarea>
     </div>` : `
     <div class="cn-first">
-      今日が最初のページです。明日からは、ここに前に書いた日の望む成果が出て、ふりかえりを書けるようになります。
+      今日が最初のページです。明日から、ここに「きのうのふりかえり」が出ます。
     </div>`;
 
-  page.insertAdjacentHTML('afterbegin', `
-    <div class="card">
-      <h3><span class="bar"></span>今日のページ<span class="muted" style="margin-left:auto;font-weight:400">Day ${dayNo}</span></h3>
-      <div class="cn-date">${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日（${CN_WD[now.getDay()]}）</div>
-      <p class="cn-priv">書いたものは、この端末の中にだけ残ります。どこにも送られません。</p>
+  const formHtml = `
+      <div class="cn-meta"><b>${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日（${CN_WD[now.getDay()]}）</b><span>Day ${dayNo}</span></div>
       ${yest}
-      <div class="cn-block">
-        <div class="cn-step"><i>ステップ1</i>今日の望む成果</div>
-        <div class="cn-q">今日が終わったとき、どうなっていたらいいですか。</div>
-        <textarea class="cn-ta" id="cn-goal" placeholder="1〜2行">${esc(today.goal || '')}</textarea>
-      </div>
-      <div class="cn-block">
-        <div class="cn-step"><i>ステップ2</i>いまの現実</div>
-        <div class="cn-q">そこから見て、いまはどうですか。</div>
-        <div class="cn-hint">良い悪いは抜きで、そのまま。</div>
-        <textarea class="cn-ta" id="cn-reality" placeholder="1〜2行">${esc(today.reality || '')}</textarea>
-      </div>
-      <div class="cn-block cn-tension">
-        <div class="cn-step"><i>ステップ3</i>そのあいだにあるもの</div>
-        <div class="cn-hint">望む成果と、いまの現実。ふたつのあいだにあるものを、ひと呼吸、感じてから次へ。ここは書かなくてかまいません。</div>
-      </div>
-      <div class="cn-block">
-        <div class="cn-step"><i>ステップ4</i>今日のアクション</div>
-        <div class="cn-q">差を解消するために、今日すること。</div>
-        <div class="cn-hint">1〜3個。かかる時間も書いておくと、明日ふり返るときに効きます。</div>
-        ${[0,1,2].map(actRow).join('')}
+      <div class="cs">
+        <div class="cs-box cs-goal">
+          <div class="cs-t"><i>①</i>望む成果</div>
+          <div class="cs-q">今日が終わったとき、どうなっていたらいいですか。</div>
+          <textarea class="cn-ta" id="cn-goal">${esc(today.goal || '')}</textarea>
+        </div>
+        <div class="cs-box cs-real">
+          <div class="cs-t"><i>②</i>今の現実</div>
+          <div class="cs-q">望む成果から見て、いまわかっていること、わかっていないこと。</div>
+          <textarea class="cn-ta" id="cn-reality">${esc(today.reality || '')}</textarea>
+        </div>
+        <svg class="cs-tent" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0,10 L50,0 L100,10" fill="none" stroke="currentColor" stroke-width="1.5"
+                vector-effect="non-scaling-stroke" stroke-linejoin="round"></path>
+        </svg>
+        <div class="cs-mid">
+          <div class="cs-t"><i>③</i>アクションステップ</div>
+          <div class="cs-q">ふたつのあいだのテンションを、解消する行動。かかる時間も。</div>
+          <div id="cn-acts">${Array.from({ length: rowCount }, (_, i) => actRow(i, acts[i])).join('')}</div>
+        </div>
       </div>
       <div class="cn-bar">
         <button class="add-res-btn" id="cn-copy">全部をコピー</button>
@@ -1097,27 +1134,35 @@ async function renderNote(hasRoom){
       </div>
       <div class="cn-saveinfo" id="cn-saved">書いたものは自動で保存されます</div>
       <div class="cn-foot">
-        書けなかった日も、いまの現実のひとつです。飛ばしたまま、次の日へ進んでください。<br>
         この端末のブラウザにだけ保存されます。履歴やサイトデータを消すと、ノートも消えます。
       </div>
-    </div>
-    ${pastKeys.length ? `<div class="card">
-      <details class="cn-details"><summary>これまでのページ（${pastKeys.length}日）</summary>
+      ${pastKeys.length ? `<details class="cn-details"><summary>これまでのページ（${pastKeys.length}日）</summary>
         ${pastKeys.slice().reverse().map(k => {
           const e = data[k];
           return `<div class="cn-past"><b>${esc(cnJDate(k))}</b><div>${esc(cnEntryText(k, e).split('\n').slice(1).join('\n').trim())}</div></div>`;
         }).join('')}
-      </details>
-    </div>` : ''}`);
+      </details>` : ''}`;
+
+  // ノート本体は、1枚目のカード（緊張構造チャート）の中に入れる。
+  // セクションがまだ作られていないときは、単独のカードとして出す。
+  const host = page.querySelector('.sec-card');
+  if (host) host.insertAdjacentHTML('beforeend', `<div class="cn-form">${formHtml}</div>`);
+  else page.insertAdjacentHTML('afterbegin',
+    `<div class="card sec-card"><h3><span class="bar"></span>緊張構造チャート</h3>
+      <div class="sec-lead">1日5分、1日1日、望む成果へ前進していくためのノートです。</div>
+      <div class="cn-form">${formHtml}</div></div>`);
 
   const grow = ta => { ta.style.height = 'auto'; ta.style.height = Math.max(46, ta.scrollHeight + 2) + 'px'; };
-  const actT = [...page.querySelectorAll('.cn-act-t')], actM = [...page.querySelectorAll('.cn-act-m')];
+  const actsWrap = $('cn-acts');
   const val = id => $(id) ? $(id).value : '';
   let timer = null;
   function save(quiet){
     const entry = {
       reflect: val('cn-reflect'), goal: val('cn-goal'), reality: val('cn-reality'),
-      actions: actT.map((a, i) => ({ text: a.value.trim(), min: actM[i].value.trim() })).filter(a => a.text),
+      actions: [...actsWrap.querySelectorAll('.cn-act')].map(r => ({
+        text: r.querySelector('.cn-act-t').value.trim(),
+        min: r.querySelector('.cn-act-m').value.trim(),
+      })).filter(a => a.text),
       ts: Date.now(),
     };
     const empty = !entry.reflect && !entry.goal && !entry.reality && !entry.actions.length;
@@ -1128,13 +1173,24 @@ async function renderNote(hasRoom){
                                 : 'この端末に保存できませんでした（プライベートブラウズかもしれません）';
     return ok;
   }
-  page.querySelectorAll('.cn-ta, .cn-min').forEach(el => {
+  // 最後の行に書き始めたら、その下に空の行を1つ足す。数はこちらで決めない
+  function ensureSpare(){
+    const rows = [...actsWrap.querySelectorAll('.cn-act')];
+    if (rows.length >= CN_ROW_MAX) return;
+    const last = rows[rows.length - 1];
+    if (!last || !last.querySelector('.cn-act-t').value.trim()) return;
+    actsWrap.insertAdjacentHTML('beforeend', actRow(rows.length, null));
+    actsWrap.lastElementChild.querySelectorAll('.cn-ta, .cn-min').forEach(bind);
+  }
+  function bind(el){
     if (el.tagName === 'TEXTAREA') grow(el);
     el.addEventListener('input', () => {
       if (el.tagName === 'TEXTAREA') grow(el);
+      if (el.classList.contains('cn-act-t')) ensureSpare();
       clearTimeout(timer); timer = setTimeout(() => save(true), 500);
     });
-  });
+  }
+  page.querySelectorAll('.cn-ta, .cn-min').forEach(bind);
   $('cn-done').onclick = () => { clearTimeout(timer); if (save(true)) toast('保存しました。また明日。'); };
   $('cn-copy').onclick = async () => {
     clearTimeout(timer); save(true);
@@ -1157,10 +1213,18 @@ function richText(t){
     return line.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
   }).join('<br>');
 }
-async function renderPinned(){
+/* 本文の中で --- ではさんだところを、コピーできる枠にする（プロンプトなど） */
+function richCopy(body){
+  return String(body || '').split(/^-{3,}$/m).map((seg, i) => i % 2
+    ? (seg.trim() ? `<div class="copybox"><pre>${esc(seg.replace(/^\n+|\n+$/g, ''))}</pre>
+        <div class="cb-bar"><button class="add-res-btn" data-copybox="1">コピーする</button></div></div>` : '')
+    : richText(seg)).join('');
+}
+async function renderPinned(opts = {}){
   const room = S.current.room;
   const p = room.pinned || {};
   const editor = canEdit(room.id);
+  const fold = !!opts.fold;   // true のとき、セクションを折りたたみ（Creatingノートのタブ）
 
   // 参加希望の受付（signups）を取得。テーブル未作成やエラー時はセクションごとスキップ
   let sgs = [], sgResp = [];
@@ -1192,7 +1256,7 @@ async function renderPinned(){
       ${p.contacts.map(c => `<div class="kv"><b>${esc(c.label)}</b>${esc(c.value)}</div>`).join('')}
     </div>`);
   }
-  if (half.length) h += `<div class="info-grid">${half.join('')}</div>`;
+  // 参加希望の受付は、その日に動くもの。Zoom やスケジュールより先に出す
   if (!sgErr && (sgs.length || editor) && room.slug !== 'entrance') {   // はじめかた本体には出さない（Creatingノートのタブ側にある）
     h += `<div class="card sg-card"><h3><span class="bar"></span>🙋 参加希望の受付${editor ? `<span style="margin-left:auto"><button class="res-del" id="add-signup" title="受付を追加">＋ 追加</button></span>` : ''}</h3>
       ${sgs.length ? sgs.map(s => {
@@ -1207,6 +1271,7 @@ async function renderPinned(){
       }).join('') : `<div class="empty" style="padding:8px 0">いま受付中のものはありません</div>`}
     </div>`;
   }
+  if (half.length) h += `<div class="info-grid">${half.join('')}</div>`;
   if (p.schedule?.length) {
     h += `<div class="card"><h3><span class="bar"></span>${esc(p.schedule_title || 'スケジュール')}</h3>
       <ul class="sched">${p.schedule.map(s => `<li>${esc(s)}</li>`).join('')}</ul>
@@ -1226,6 +1291,21 @@ async function renderPinned(){
     </div>`;
   }
   (p.sections || []).forEach((s, idx) => {
+    if (fold) {
+      // Creatingノートのタブ：本文の1行目だけをカードに出し、残りは「くわしく」の中に畳む
+      const lines = (s.body || '').split('\n');
+      const i0 = lines.findIndex(l => l.trim());
+      const lead = i0 >= 0 ? lines[i0] : '';
+      const rest = i0 >= 0 ? lines.slice(i0 + 1).join('\n').replace(/^\s*\n/, '') : '';
+      h += `<div class="card sec-card" data-sec="${idx}">
+        <h3><span class="bar"></span>${esc(s.title || '')}</h3>
+        ${lead ? `<div class="sec-lead">${richText(lead)}</div>` : ''}
+        ${rest.trim() ? `<details class="sec-more"><summary>くわしく</summary>
+          <div class="sec-body">${richCopy(rest)}</div></details>` : ''}
+        ${editor ? `<div class="sec-tools"><button class="res-del" data-sedit="${idx}" title="編集">✏️</button><button class="res-del" data-sdel="${idx}" title="削除">✕</button></div>` : ''}
+      </div>`;
+      return;
+    }
     const btns = editor
       ? `<span style="margin-left:auto;flex-shrink:0"><button class="res-del" data-sedit="${idx}" title="編集">✏️</button><button class="res-del" data-sdel="${idx}" title="削除">✕</button></span>`
       : '';
@@ -1235,6 +1315,11 @@ async function renderPinned(){
     </div>`;
   });
   $('page').innerHTML = h || `<div class="empty">固定情報はまだありません</div>`;
+  $('page').querySelectorAll('[data-copybox]').forEach(el => el.onclick = async () => {
+    const txt = el.closest('.copybox').querySelector('pre').textContent;
+    try { await navigator.clipboard.writeText(txt); toast('コピーしました'); }
+    catch (e) { window.prompt('長押し（または Ctrl+C）でコピーしてください', txt); }
+  });
   const ei = $('edit-info'); if (ei) ei.onclick = openInfoModal;
   const as = $('add-sec'); if (as) as.onclick = () => openSecModal(null);
   const asg = $('add-signup'); if (asg) asg.onclick = () => {
