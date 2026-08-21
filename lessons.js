@@ -137,7 +137,8 @@ async function openRoomAbout(room){
         ${c.price_jpy != null ? `<div class="kv"><b>参加費</b>¥${Number(c.price_jpy).toLocaleString('ja-JP')}</div>` : ''}
         ${c.payment_info ? `<div class="kv stack"><b>お支払い</b><span>${richText(c.payment_info)}</span></div>` : ''}
         ${myCMFor(c.id)
-          ? `<p class="muted" style="margin-top:8px">✓ 参加を受け付けました${myCMFor(c.id).paid_at ? '' : '（お支払いの確認待ち）'}</p>`
+          ? `<p class="muted" style="margin-top:8px">✓ 参加を受け付けました${myCMFor(c.id).paid_at ? '' : '（お支払いの確認待ち）'}</p>
+             ${!myCMFor(c.id).paid_at && c.payment_url ? `<a class="zoom-btn" href="${esc(c.payment_url)}" target="_blank" rel="noopener">お支払いページを開く</a>` : ''}`
           : `<button class="primary-btn" style="margin-top:10px" data-cohort-join="${c.id}">${c.payment_url ? '申し込む' : '参加する'}</button>`}
       </div>`).join('');
   } else {
@@ -294,7 +295,9 @@ async function openCohortDays(c){
   if (!editor && !cm?.paid_at) {
     $('page').innerHTML = `<div class="card"><h3><span class="bar"></span>${esc(c.name)}</h3>
       <p style="font-size:13px">お支払いの確認ができると、ここに毎朝のレッスンが並びます。</p>
-      ${c.payment_info ? `<div class="kv stack" style="margin-top:10px"><b>お支払い</b><span>${richText(c.payment_info)}</span></div>` : ''}
+      ${c.price_jpy != null ? `<div class="kv" style="margin-top:10px"><b>参加費</b>¥${Number(c.price_jpy).toLocaleString('ja-JP')}</div>` : ''}
+      ${c.payment_info ? `<div class="kv stack"><b>お支払い</b><span>${richText(c.payment_info)}</span></div>` : ''}
+      ${c.payment_url ? `<a class="zoom-btn" href="${esc(c.payment_url)}" target="_blank" rel="noopener">お支払いページを開く</a>` : ''}
     </div>`;
     return;
   }
@@ -345,7 +348,7 @@ function drawDays(){
     openLesson(L.lessons.find(l => l.id === el.dataset.lesson));
   });
   $('page').querySelectorAll('[data-ledit]').forEach(el => el.onclick = e => { e.stopPropagation(); openPostPage(L.lessons.find(l => l.id === el.dataset.ledit), c); });
-  const nd = $('page').querySelector('[data-newday]'); if (nd) nd.onclick = () => openPostPage(null, c);
+  const nd = $('page').querySelector('[data-newday]'); if (nd) nd.onclick = () => { L.postDraft = null; openPostPage(null, c, true); };
   const ce = $('c-edit'); if (ce) ce.onclick = () => openCohortModal(c, cohortRoom(c));
 }
 const nextDayNo = c => (L.lessons.filter(l => l.cohort_id === c.id).reduce((m, l) => Math.max(m, l.day_no), 0) + 1);
@@ -632,7 +635,7 @@ const postCountHint = d => (d.title || '').trim()
   ? `1行目がタイトルになります：<b>${esc(d.title.trim())}</b>` + ((d.body || '').trim() ? `　／　本文 ${d.body.trim().length}文字` : '　／　本文はまだありません')
   : '1行目にタイトル、2行目から本文。長押し → ペーストで入ります';
 
-async function openPostPage(lesson, cohort){
+async function openPostPage(lesson, cohort, forceNew){
   const cs = editorCohorts().filter(c => c.status !== 'past');
   if (!cs.length && !lesson) {
     leaveChat(); S.current = { type:'post' }; $('room-title').textContent = 'レッスンを出す'; $('tabs').innerHTML = ''; updatePinBtn(); highlightNav();
@@ -640,7 +643,13 @@ async function openPostPage(lesson, cohort){
     return;
   }
   const c = cohort || (lesson ? L.cohorts.find(x => x.id === lesson.cohort_id) : (cs.find(x => x.status === 'active') || cs[0]));
-  if (!lesson) { L.cohort = c; try { await loadCohortLessons(c); } catch (_) {} }   // Day 番号を正しく出すために毎回読む
+  if (!lesson) {
+    L.cohort = c;
+    try { await loadCohortLessons(c); } catch (_) {}   // Day 番号を正しく出すために毎回読む
+    // 書きかけ（まだ出していない回）があれば、新規ではなくその続きを開く
+    const drafts = L.lessons.filter(l => l.cohort_id === c.id && !l.publish_at).sort((a, b) => a.day_no - b.day_no);
+    if (drafts.length && !forceNew) lesson = drafts[drafts.length - 1];
+  }
   const d = L.postDraft && L.postDraft.lessonId === (lesson?.id || null) && L.postDraft.cohortId === c.id ? L.postDraft : {
     lessonId: lesson?.id || null, cohortId: c.id,
     day: lesson?.day_no || nextDayNo(c),
@@ -652,15 +661,17 @@ async function openPostPage(lesson, cohort){
   L.postDraft = d;
   leaveChat();
   S.current = { type:'post', cohort: c, lesson };
-  $('room-title').textContent = 'レッスンを出す';
-  $('tabs').innerHTML = '';
+  $('room-title').textContent = lesson ? `${c.name} ・ Day ${lesson.day_no}` : 'レッスンを出す';
+  const backRoom = cohortRoom(c);
+  $('tabs').innerHTML = `<div class="tab" data-tab="back">‹ ${esc(c.name)}</div>`;
+  $('tabs').querySelector('[data-tab="back"]').onclick = () => { L.postDraft = null; openCohortDays(c); };
   updatePinBtn(); highlightNav();
   if (d.imagePath && !d.imageUrl) d.imageUrl = await lessonImageUrl(d.imagePath);
   const isPublished = lesson?.publish_at && new Date(lesson.publish_at) <= new Date();
   const whenLabel = { now:'出す', am:'明朝 6:00 に出す', keep: isPublished ? '更新する' : '保存する' };
   $('page').innerHTML = `
     <div class="postbar">
-      <div class="postbar-t">${lesson ? `Day ${d.day} を編集` : 'レッスンを出す'}</div>
+      <div class="postbar-t">${lesson ? (lesson.publish_at ? `Day ${d.day} を編集` : `Day ${d.day}（下書き）`) : 'レッスンを出す'}</div>
       <span class="postbar-saved" id="p-saved">${d.savedAt ? '下書きを保存しました ' + d.savedAt : '書いたものは自動で保存されます'}</span>
       <button class="postbar-go" id="p-go" ${hasContent(d) ? '' : 'disabled'}>${whenLabel[d.when]}</button>
     </div>
@@ -689,7 +700,11 @@ async function openPostPage(lesson, cohort){
       </div>
       <div class="phint">${d.when === 'now' ? '押した瞬間に、参加者の画面に出ます' : d.when === 'am' ? '前の晩に書けたときだけ使います。朝6時に自動で出ます' : '公開のタイミングは変えません'}</div>
       <button class="pbig" id="p-go2" ${hasContent(d) ? '' : 'disabled'}>${whenLabel[d.when]}</button>
-      ${lesson ? `<button class="ghost-btn" id="p-del" style="margin-top:14px">この回を削除する</button>` : ''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+        <button class="ghost-btn" id="p-back">${esc(c.name)} の一覧へ</button>
+        ${lesson ? `<button class="ghost-btn" id="p-new">＋ 新しい回を書く</button>` : ''}
+        ${lesson ? `<button class="ghost-btn" id="p-del">この回を削除する</button>` : ''}
+      </div>
     </div>`;
 
   const bd = $('p-body'), dy = $('p-day');
@@ -730,6 +745,8 @@ async function openPostPage(lesson, cohort){
   const rm = $('p-rmimg'); if (rm) rm.onclick = () => { d.imagePath = null; d.imageUrl = null; markDirty(); openPostPage(lesson, c); };
   const go = () => publishLesson(lesson, c);
   $('p-go').onclick = go; $('p-go2').onclick = go;
+  const bk = $('p-back'); if (bk) bk.onclick = () => { L.postDraft = null; openCohortDays(c); };
+  const nw = $('p-new'); if (nw) nw.onclick = () => { L.postDraft = null; openPostPage(null, c, true); };
   const del = $('p-del'); if (del) del.onclick = async () => {
     if (!confirm(`Day ${lesson.day_no} を削除しますか？コメントも一緒に消えます。`)) return;
     const { error } = await supa.from('lessons').delete().eq('id', lesson.id);
