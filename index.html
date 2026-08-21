@@ -929,23 +929,19 @@ const NAV_GROUPS = [['together','みんなとつくる'],['continue','つくり�
 const navGroupOf = r => r.kind === 'tool' ? 'hidden' : (r.nav_group || 'together');   // 道具（Creatingノートなど）は「はじめかた」のタブの中に出す
 function renderNav(){
   const entrance = S.rooms.find(r => r.slug === 'entrance' && isMember(r.id));
-  const lessonsEditor = S.rooms.some(r => isLessonsRoom(r) && canEdit(r.id));
   let h = `<div class="nav-label">${t('ホーム')}</div>
     <div class="nav-item" data-nav="home"><span class="dot"></span>${t('新着フィード')}</div>`;
   if (entrance) h += `<div class="nav-item" data-nav="${entrance.id}"><span class="dot"></span>${esc(t(entrance.name))}</div>`;
   h += `<div class="nav-item" data-nav="pins"><span class="dot"></span>${t('ピンした場所')}</div>`;
-  if (lessonsEditor) {
-    h += `<div class="nav-item" data-nav="queue"><span class="dot"></span>${t('未返信')}<span class="nav-badge" style="${L.queueCount ? '' : 'display:none'}">${L.queueCount || ''}</span></div>
-      <div class="nav-item" data-nav="post"><span class="dot"></span>${t('レッスンを出す')}</div>`;
-  }
   NAV_GROUPS.forEach(([key, label]) => {
     const rooms = S.rooms.filter(r => r.slug !== 'entrance' && navGroupOf(r) === key);
     if (!rooms.length) return;
     h += `<div class="nav-label">${t(label)}</div>` + rooms.map(r => {
       const member = isMember(r.id);
       const open = !member && L.cohorts.some(c => c.room_id === r.id && c.status === 'open');
-      const badge = open ? `<span class="nav-tag">${t('募集中')}</span>`
-        : (!member && r.visibility === 'public') ? `<button class="join-mini" data-join="${r.id}">${t('参加')}</button>` : '';
+      const unread = (isLessonsRoom(r) && canEdit(r.id) && L.queueCount) ? `<span class="nav-badge" data-queue-badge title="${t('未返信')}">${L.queueCount}</span>` : '';
+      const badge = unread || (open ? `<span class="nav-tag">${t('募集中')}</span>`
+        : (!member && r.visibility === 'public') ? `<button class="join-mini" data-join="${r.id}">${t('参加')}</button>` : '');
       return `<div class="nav-item ${member ? '' : 'locked'}" data-nav="${r.id}"><span class="dot"></span><span class="nav-name">${esc(t(r.name))}${r.subtitle && !member ? `<span class="nav-sub">${esc(r.subtitle)}</span>` : ''}</span>${badge}</div>`;
     }).join('');
   });
@@ -955,8 +951,6 @@ function renderNav(){
     const k = el.dataset.nav;
     if (k === 'home') openHome();
     else if (k === 'pins') openPinsPage();
-    else if (k === 'queue') openQueuePage();
-    else if (k === 'post') openPostPage();
     else openRoom(S.rooms.find(r => r.id === k));
   });
   $('nav').querySelectorAll('[data-join]').forEach(el => el.onclick = e => { e.stopPropagation(); joinPublicRoom(el.dataset.join); });

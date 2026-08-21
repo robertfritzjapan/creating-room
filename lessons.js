@@ -49,8 +49,7 @@ const editorCohorts = () => L.cohorts.filter(c => canEditCohort(c));
 async function refreshQueueCount(){
   const q = await fetchQueue();
   L.queueCount = q.length;
-  const b = document.querySelector('[data-nav="queue"] .nav-badge');
-  if (b) { b.textContent = L.queueCount || ''; b.style.display = L.queueCount ? 'inline-block' : 'none'; }
+  refreshQueueBadge();
   return L.queueCount;
 }
 
@@ -608,9 +607,11 @@ async function openQueuePage(){
     openLesson(data, { replyTo: el.dataset.q });
   });
 }
+/* 未返信の件数は、サイドバーの 21 Lessons の行に出す（editor 以上にだけ見えます） */
 function refreshQueueBadge(){
-  const b = document.querySelector('[data-nav="queue"] .nav-badge');
-  if (b) { b.textContent = L.queueCount || ''; b.style.display = L.queueCount ? 'inline-block' : 'none'; }
+  const b = document.querySelector('[data-queue-badge]');
+  if (b && L.queueCount) { b.textContent = L.queueCount; return; }
+  renderNav(); highlightNav();
 }
 
 /* ============================================================
