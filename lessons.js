@@ -221,7 +221,7 @@ async function renderSeries(){
         <div class="lt2">${esc(c.period_label || '')}${c.status === 'past' ? '　受講済み・いつでも読み返せます' : ''}${unpaid ? '　<span style="color:var(--ai)">お支払いの確認待ち</span>' : ''}</div>
         ${unpaid && c.payment_info ? `<div class="lt2" style="margin-top:4px">${richText(c.payment_info)}</div>` : ''}
       </div>
-      <div class="lright">${c.status === 'active' ? '<span class="pill-g">受講中</span>' : c.status === 'open' ? '<span class="pill-open">募集中</span>' : c.status === 'draft' ? '<span class="pill-g">準備中</span>' : '読み返す'}</div>
+      <div class="lright">${c.status === 'active' ? '<span class="pill-g">受講中</span>' : c.status === 'open' ? '<span class="pill-open">募集中</span>' : c.status === 'draft' ? '<span class="pill-g">準備中</span>' : '読み返す'}${editor ? `<button class="res-del" data-cedit="${c.id}" title="この期を編集" style="margin-left:4px">✏️</button>` : ''}</div>
     </div>`;
   };
   const sec = (t, a, e) => a.length ? `<div class="card"><h3><span class="bar"></span>${t}${e ? `<span class="muted" style="margin-left:auto;font-weight:400">${e}</span>` : ''}</h3>${a.map(row).join('')}</div>` : '';
@@ -251,7 +251,13 @@ async function renderSeries(){
   }
   $('page').innerHTML = h;
   $('page').querySelectorAll('[data-tag]').forEach(el => el.onclick = () => { L.tagFilter = el.dataset.tag === 'すべて' ? null : el.dataset.tag; renderSeries(); });
-  $('page').querySelectorAll('[data-cohort]').forEach(el => el.onclick = () => openCohortDays(L.cohorts.find(c => c.id === el.dataset.cohort)));
+  $('page').querySelectorAll('[data-cohort]').forEach(el => el.onclick = e => {
+    if (e.target.closest('button')) return;
+    openCohortDays(L.cohorts.find(c => c.id === el.dataset.cohort));
+  });
+  $('page').querySelectorAll('[data-cedit]').forEach(el => el.onclick = e => {
+    e.stopPropagation(); openCohortModal(L.cohorts.find(c => c.id === el.dataset.cedit), room);
+  });
   $('page').querySelectorAll('[data-cohort-about]').forEach(el => el.onclick = () => openRoomAbout(room));
   const gp = $('go-post'); if (gp) gp.onclick = () => openPostPage();
   const gq = $('go-queue'); if (gq) gq.onclick = () => openQueuePage();
@@ -328,6 +334,9 @@ function drawDays(){
   const empty = !L.lessons.length && !editor
     ? `<div class="empty">${c.starts_on && new Date(c.starts_on) > new Date() ? `${fmtDateJ(c.starts_on)} の朝から始まります` : 'まだレッスンはありません。最初の回をお待ちください'}</div>` : '';
   $('page').innerHTML = `
+    ${editor ? `<div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="add-res-btn" style="margin-bottom:0" id="c-edit">✏️ この期を編集</button>
+    </div>` : ''}
     <div class="card">
       <h3><span class="bar"></span>${total}日のレッスン<span class="muted" style="margin-left:auto;font-weight:400">${published.length}／${total} 公開${!editor && published.length ? `　読了 ${readCount}` : ''}</span></h3>
       ${published.length ? `<div class="prog"><i style="width:${Math.round(published.length / total * 100)}%"></i></div>` : ''}
@@ -339,6 +348,7 @@ function drawDays(){
   });
   $('page').querySelectorAll('[data-ledit]').forEach(el => el.onclick = e => { e.stopPropagation(); openPostPage(L.lessons.find(l => l.id === el.dataset.ledit), c); });
   const nd = $('page').querySelector('[data-newday]'); if (nd) nd.onclick = () => openPostPage(null, c);
+  const ce = $('c-edit'); if (ce) ce.onclick = () => openCohortModal(c, cohortRoom(c));
 }
 const nextDayNo = c => (L.lessons.filter(l => l.cohort_id === c.id).reduce((m, l) => Math.max(m, l.day_no), 0) + 1);
 
@@ -611,6 +621,17 @@ function tomorrow6amJST(){
   const g = t => Number(p.find(x => x.type === t).value);
   return new Date(Date.UTC(g('year'), g('month') - 1, g('day') + 1, 6 - 9, 0, 0)).toISOString();   // 翌日 06:00 JST
 }
+/* 1行目をタイトル、2行目以降を本文として扱う */
+const splitTB = v => {
+  const i = v.indexOf('\n');
+  return i < 0 ? { t: v.trim(), b: '' } : { t: v.slice(0, i).trim(), b: v.slice(i + 1).replace(/^\n+/, '') };
+};
+const joinTB = (t, b) => (t ? t + (b ? '\n\n' + b : '') : (b || ''));
+const hasContent = d => !!((d.title || '').trim() || (d.body || '').trim());
+const postCountHint = d => (d.title || '').trim()
+  ? `1行目がタイトルになります：<b>${esc(d.title.trim())}</b>` + ((d.body || '').trim() ? `　／　本文 ${d.body.trim().length}文字` : '　／　本文はまだありません')
+  : '1行目にタイトル、2行目から本文。長押し → ペーストで入ります';
+
 async function openPostPage(lesson, cohort){
   const cs = editorCohorts().filter(c => c.status !== 'past');
   if (!cs.length && !lesson) {
@@ -641,7 +662,7 @@ async function openPostPage(lesson, cohort){
     <div class="postbar">
       <div class="postbar-t">${lesson ? `Day ${d.day} を編集` : 'レッスンを出す'}</div>
       <span class="postbar-saved" id="p-saved">${d.savedAt ? '下書きを保存しました ' + d.savedAt : '書いたものは自動で保存されます'}</span>
-      <button class="postbar-go" id="p-go" ${d.body.trim() ? '' : 'disabled'}>${whenLabel[d.when]}</button>
+      <button class="postbar-go" id="p-go" ${hasContent(d) ? '' : 'disabled'}>${whenLabel[d.when]}</button>
     </div>
     <div class="card postcard">
       <div class="ctx">
@@ -649,11 +670,9 @@ async function openPostPage(lesson, cohort){
         ${!lesson && cs.length > 1 ? `<select id="p-cohort" class="ctx-sel">${cs.map(x => `<option value="${x.id}" ${x.id === c.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>` : ''}
         <input type="number" id="p-day" class="ctx-day" value="${d.day}" min="1" max="99" title="Day">
       </div>
-      <label class="plabel">タイトル</label>
-      <input class="pinput" id="p-title" value="${esc(d.title)}" placeholder="レッスンのタイトルを書いてください">
-      <label class="plabel">本文</label>
-      <textarea class="pinput ptext" id="p-body" placeholder="ChatGPT からコピーして、ここに貼ってください">${esc(d.body)}</textarea>
-      <div class="phint" id="p-count">${d.body.length ? d.body.length + '文字' : '長押し → ペーストで入ります'}</div>
+      <label class="plabel">レッスン</label>
+      <textarea class="pinput ptext" id="p-body" placeholder="1行目にタイトル、2行目から本文を書いてください。&#10;ChatGPT からコピーして、そのまま貼るだけでも大丈夫です。">${esc(joinTB(d.title, d.body))}</textarea>
+      <div class="phint" id="p-count">${postCountHint(d)}</div>
       <label class="plabel">インフォグラフィック</label>
       <div id="p-imgwrap">${d.imageUrl
         ? `<div class="pthumb"><img src="${d.imageUrl}" alt=""><button class="prm" id="p-rmimg">外す</button></div>`
@@ -669,22 +688,21 @@ async function openPostPage(lesson, cohort){
         <button data-w="am" class="${d.when === 'am' ? 'on' : ''}">明朝 6:00 に出す</button>
       </div>
       <div class="phint">${d.when === 'now' ? '押した瞬間に、参加者の画面に出ます' : d.when === 'am' ? '前の晩に書けたときだけ使います。朝6時に自動で出ます' : '公開のタイミングは変えません'}</div>
-      <button class="pbig" id="p-go2" ${d.body.trim() ? '' : 'disabled'}>${whenLabel[d.when]}</button>
+      <button class="pbig" id="p-go2" ${hasContent(d) ? '' : 'disabled'}>${whenLabel[d.when]}</button>
       ${lesson ? `<button class="ghost-btn" id="p-del" style="margin-top:14px">この回を削除する</button>` : ''}
     </div>`;
 
-  const bd = $('p-body'), ti = $('p-title'), dy = $('p-day');
+  const bd = $('p-body'), dy = $('p-day');
   const grow = () => { bd.style.height = 'auto'; bd.style.height = Math.max(180, bd.scrollHeight) + 'px'; };
   grow();
   const sync = () => {
-    const ok = !!d.body.trim();
+    const ok = hasContent(d);
     $('p-go').disabled = !ok; $('p-go2').disabled = !ok;
-    $('p-count').textContent = d.body.length ? d.body.length + '文字' : '長押し → ペーストで入ります';
+    $('p-count').innerHTML = postCountHint(d);
   };
   let saveTimer = null;
   const markDirty = () => { d.dirty = true; clearTimeout(saveTimer); saveTimer = setTimeout(saveDraft, 1200); };
-  ti.oninput = () => { d.title = ti.value; markDirty(); };
-  bd.oninput = () => { d.body = bd.value; grow(); sync(); markDirty(); };
+  bd.oninput = () => { const st = splitTB(bd.value); d.title = st.t; d.body = st.b; grow(); sync(); markDirty(); };
   dy.onchange = () => { d.day = Number(dy.value) || d.day; markDirty(); };
   const sel = $('p-cohort'); if (sel) sel.onchange = () => { L.postDraft = null; openPostPage(null, L.cohorts.find(x => x.id === sel.value)); };
   $('page').querySelectorAll('[data-w]').forEach(b => b.onclick = () => { d.when = b.dataset.w; openPostPage(lesson, c); });
@@ -722,7 +740,7 @@ async function openPostPage(lesson, cohort){
 
   async function saveDraft(){
     if (!d.dirty) return;
-    const row = { cohort_id: c.id, day_no: d.day, title: d.title || null, body: d.body || null, image_path: d.imagePath };
+    const row = { cohort_id: c.id, day_no: d.day, title: d.title.trim() || null, body: d.body.trim() || null, image_path: d.imagePath };
     let q;
     if (d.lessonId) q = supa.from('lessons').update(row).eq('id', d.lessonId).select().single();
     else if (d.body.trim() || d.title.trim()) q = supa.from('lessons').insert({ ...row, publish_at: null }).select().single();
@@ -735,10 +753,10 @@ async function openPostPage(lesson, cohort){
     const i = L.lessons.findIndex(x => x.id === data.id); if (i >= 0) L.lessons[i] = data; else if (L.cohort?.id === c.id) L.lessons.push(data);
   }
   async function publishLesson(){
-    if (!d.body.trim()) return;
+    if (!hasContent(d)) return;
     clearTimeout(saveTimer);
     const publish_at = d.when === 'now' ? new Date().toISOString() : d.when === 'am' ? tomorrow6amJST() : d.publishAt;
-    const row = { cohort_id: c.id, day_no: d.day, title: d.title || null, body: d.body, image_path: d.imagePath, publish_at };
+    const row = { cohort_id: c.id, day_no: d.day, title: d.title.trim() || null, body: d.body.trim() || null, image_path: d.imagePath, publish_at };
     const { data, error } = d.lessonId
       ? await supa.from('lessons').update(row).eq('id', d.lessonId).select().single()
       : await supa.from('lessons').insert(row).select().single();
@@ -809,7 +827,10 @@ function openCohortModal(c, room){
     const { data } = await supa.from('cohorts').select('*').order('sort_order').order('starts_on', { ascending:false });
     L.cohorts = data || L.cohorts;
     toast('保存しました'); renderNav();
-    if (S.current?.type === 'room') renderSeries(); else openLessonsRoom(room);
+    const fresh = c ? (L.cohorts.find(x => x.id === c.id) || c) : null;
+    if (S.current?.type === 'cohort' && fresh) openCohortDays(fresh);
+    else if (S.current?.type === 'room') renderSeries();
+    else openLessonsRoom(room);
   };
 }
 
