@@ -138,7 +138,7 @@ async function openRoomAbout(room){
         ${c.payment_info ? `<div class="kv stack"><b>お支払い</b><span>${richText(c.payment_info)}</span></div>` : ''}
         ${myCMFor(c.id)
           ? `<p class="muted" style="margin-top:8px">✓ 参加を受け付けました${myCMFor(c.id).paid_at ? '' : '（お支払いの確認待ち）'}</p>
-             ${!myCMFor(c.id).paid_at && c.payment_url ? `<a class="zoom-btn" href="${esc(c.payment_url)}" target="_blank" rel="noopener">お支払いページを開く</a>` : ''}`
+             ${!myCMFor(c.id).paid_at && c.payment_url ? `<a class="zoom-btn" href="${esc(c.payment_url)}" target="_blank" rel="noopener">${payLabel(c.payment_url)}</a>` : ''}`
           : `<button class="primary-btn" style="margin-top:10px" data-cohort-join="${c.id}">${c.payment_url ? '申し込む' : '参加する'}</button>`}
       </div>`).join('');
   } else {
@@ -297,7 +297,7 @@ async function openCohortDays(c){
       <p style="font-size:13px">お支払いの確認ができると、ここに毎朝のレッスンが並びます。</p>
       ${c.price_jpy != null ? `<div class="kv" style="margin-top:10px"><b>参加費</b>¥${Number(c.price_jpy).toLocaleString('ja-JP')}</div>` : ''}
       ${c.payment_info ? `<div class="kv stack"><b>お支払い</b><span>${richText(c.payment_info)}</span></div>` : ''}
-      ${c.payment_url ? `<a class="zoom-btn" href="${esc(c.payment_url)}" target="_blank" rel="noopener">お支払いページを開く</a>` : ''}
+      ${c.payment_url ? `<a class="zoom-btn" href="${esc(c.payment_url)}" target="_blank" rel="noopener">${payLabel(c.payment_url)}</a>` : ''}
     </div>`;
     return;
   }
@@ -337,6 +337,12 @@ function drawDays(){
   $('page').innerHTML = `
     ${editor ? `<div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="add-res-btn" style="margin-bottom:0" id="c-edit">✏️ この期を編集</button>
+    </div>` : ''}
+    ${editor && (c.price_jpy != null || c.payment_info || c.payment_url) ? `<div class="card" style="background:#faf9f8">
+      <h3><span class="bar"></span>参加者に見えるお支払いの案内<span class="muted" style="margin-left:auto;font-weight:400">入金確認がつくまで表示されます</span></h3>
+      ${c.price_jpy != null ? `<div class="kv"><b>参加費</b>¥${Number(c.price_jpy).toLocaleString('ja-JP')}</div>` : ''}
+      ${c.payment_info ? `<div class="kv stack"><b>お支払い</b><span>${richText(c.payment_info)}</span></div>` : ''}
+      ${c.payment_url ? `<a class="zoom-btn" href="${esc(c.payment_url)}" target="_blank" rel="noopener">${payLabel(c.payment_url)}</a>` : ''}
     </div>` : ''}
     <div class="card">
       <h3><span class="bar"></span>${total}日のレッスン<span class="muted" style="margin-left:auto;font-weight:400">${published.length}／${total} 公開${!editor && published.length ? `　読了 ${readCount}` : ''}</span></h3>
@@ -624,6 +630,16 @@ function tomorrow6amJST(){
   const g = t => Number(p.find(x => x.type === t).value);
   return new Date(Date.UTC(g('year'), g('month') - 1, g('day') + 1, 6 - 9, 0, 0)).toISOString();   // 翌日 06:00 JST
 }
+/* 決済リンクの行き先で、ボタンの文字を変える */
+function payLabel(url){
+  const u = String(url || '');
+  if (/paypay\.ne\.jp|paypay\.jp/i.test(u)) return 'PayPay で支払う';
+  if (/stripe\.com|buy\.stripe/i.test(u))    return 'カードで支払う';
+  if (/paypal\./i.test(u))                    return 'PayPal で支払う';
+  if (/line\.me|linepay/i.test(u))            return 'LINE Pay で支払う';
+  return 'お支払いページを開く';
+}
+
 /* 1行目をタイトル、2行目以降を本文として扱う */
 const splitTB = v => {
   const i = v.indexOf('\n');
