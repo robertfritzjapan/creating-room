@@ -135,7 +135,7 @@ async function openRoomAbout(room){
         ${c.starts_on ? `<div class="kv"><b>開始</b>${fmtDateJ(c.starts_on)}${c.total_sessions ? `（${c.total_sessions}日）` : ''}</div>` : ''}
         ${c.intake_to ? `<div class="kv"><b>申込期間</b>${c.intake_from ? fmtDateJ(c.intake_from) + ' 〜 ' : ''}${fmtDateJ(c.intake_to)}</div>` : ''}
         ${c.price_jpy != null ? `<div class="kv"><b>参加費</b>¥${Number(c.price_jpy).toLocaleString('ja-JP')}</div>` : ''}
-        ${c.payment_info ? `<div class="kv"><b>お支払い</b><span>${richText(c.payment_info)}</span></div>` : ''}
+        ${c.payment_info ? `<div class="kv stack"><b>お支払い</b><span>${richText(c.payment_info)}</span></div>` : ''}
         ${myCMFor(c.id)
           ? `<p class="muted" style="margin-top:8px">✓ 参加を受け付けました${myCMFor(c.id).paid_at ? '' : '（お支払いの確認待ち）'}</p>`
           : `<button class="primary-btn" style="margin-top:10px" data-cohort-join="${c.id}">${c.payment_url ? '申し込む' : '参加する'}</button>`}
@@ -218,7 +218,6 @@ async function renderSeries(){
       <div class="lmain">
         <div class="lt1">${esc(c.name)}${tagChips(c)}</div>
         <div class="lt2">${esc(c.period_label || '')}${c.status === 'past' ? '　受講済み・いつでも読み返せます' : ''}${unpaid ? '　<span style="color:var(--ai)">お支払いの確認待ち</span>' : ''}</div>
-        ${unpaid && c.payment_info ? `<div class="lt2" style="margin-top:4px">${richText(c.payment_info)}</div>` : ''}
       </div>
       <div class="lright">${c.status === 'active' ? '<span class="pill-g">受講中</span>' : c.status === 'open' ? '<span class="pill-open">募集中</span>' : c.status === 'draft' ? '<span class="pill-g">準備中</span>' : '読み返す'}${editor ? `<button class="res-del" data-cedit="${c.id}" title="この期を編集" style="margin-left:4px">✏️</button>` : ''}</div>
     </div>`;
@@ -295,7 +294,7 @@ async function openCohortDays(c){
   if (!editor && !cm?.paid_at) {
     $('page').innerHTML = `<div class="card"><h3><span class="bar"></span>${esc(c.name)}</h3>
       <p style="font-size:13px">お支払いの確認ができると、ここに毎朝のレッスンが並びます。</p>
-      ${c.payment_info ? `<div class="kv" style="margin-top:10px"><b>お支払い</b><span>${richText(c.payment_info)}</span></div>` : ''}
+      ${c.payment_info ? `<div class="kv stack" style="margin-top:10px"><b>お支払い</b><span>${richText(c.payment_info)}</span></div>` : ''}
     </div>`;
     return;
   }

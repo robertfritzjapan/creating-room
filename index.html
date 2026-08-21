@@ -82,6 +82,10 @@ a{color:var(--ai)}
 @media(max-width:760px){.info-grid{grid-template-columns:1fr}}
 .kv{font-size:14.5px;margin-bottom:8px;word-break:break-all}
 .kv b{display:inline-block;min-width:110px;color:var(--gray);font-weight:500;font-size:13px}
+/* 複数行になる項目（振込先など）はラベルを上に置く。横並びだと2行目が回り込んで崩れる */
+.kv.stack{word-break:break-word}
+.kv.stack b{display:block;min-width:0;margin-bottom:3px}
+.kv.stack>span{display:block;line-height:1.85}
 .zoom-btn{display:inline-block;margin-top:10px;background:var(--ai);color:#fff;padding:9px 22px;border-radius:6px;font-size:13px;text-decoration:none;font-weight:500}
 .sched li{margin-left:18px;margin-bottom:6px;font-size:14.5px}
 
