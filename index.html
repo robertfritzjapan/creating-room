@@ -1035,8 +1035,7 @@ function openRoom(room){
   // Creating Wayをはじめる（entrance）は道の案内。質問は「なんでも窓口」へ移したのでタブには出さない。
   // Creating ノート（道具）は、開いたらすぐチャートを書ける画面から始める。
   // 質問は「なんでも窓口」に一本化した。回ごとに質問が要る 21 Lessons だけ、部屋の中に残す。
-  // 管理者には全部屋で出す（過去に届いた質問を読み返せるように）。
-  const showChat = room.slug === 'lessons21' || roleIn(room.id) === 'admin';
+  const showChat = room.slug === 'lessons21';
   const tabs = isEntranceRoom(room)
     ? [['pinned','基本情報'],['session','セッション案内'],['resources','リソース']]
     : isNoteRoom(room)
@@ -2256,29 +2255,20 @@ async function openHome(){
   }
   $('page').innerHTML = greetHtml('') + `<div class="empty">読み込み中…</div>`;
   const roomName = id => S.rooms.find(r => r.id === id)?.name || '';
-  const [msgs, vids, status, lessonItems] = await Promise.all([
-    supa.from('messages').select('*').neq('user_id', S.user.id).order('created_at', { ascending:false }).limit(10),
+  // チャット機能は廃止したので messages は読まない（読むと去年の投稿が永遠に「新着」に出る）
+  const [vids, status, lessonItems] = await Promise.all([
     supa.from('videos').select('*').order('created_at', { ascending:false }).limit(5),
     S.firstVisit ? Promise.resolve(null) : lessonsHomeStatus().catch(() => null),
     lessonsFeedItems().catch(() => []),
   ]);
   if (S.current?.type !== 'home') return;
   const items = [
-    ...(msgs.data || []).map(m => ({ t:m.created_at, kind:'msg', m })),
     ...(vids.data || []).map(v => ({ t:v.created_at, kind:'vid', v })),
     ...(lessonItems || []),
   ].sort((a,b) => b.t < a.t ? -1 : 1).slice(0, 12);
-  await ensureNames(items.filter(i => i.kind==='msg').map(i => i.m.user_id));
   const g2 = S.firstVisit ? t('はじめましょう。') : (status?.text || '');
   $('page').innerHTML = greetHtml(g2, !!status?.go) + `<div class="card"><h3><span class="bar"></span>${t('新着')}</h3>
-    ${items.length ? items.map(i => i.kind === 'lesson' ? i.html : i.kind === 'msg' ? `
-      <div class="feed-item">
-        <div class="avatar">${esc(initialOf(S.profilesCache[i.m.user_id]))}</div>
-        <div class="feed-body">
-          <div class="feed-meta"><b>${esc(S.profilesCache[i.m.user_id] || '')}</b>がチャットに投稿<span class="room-chip">${esc(roomName(i.m.room_id))}</span> ・ ${fmtDay(i.t)} ${fmtTime(i.t)}</div>
-          <div class="feed-text">${esc(i.m.content)}</div>
-        </div>
-      </div>` : `
+    ${items.length ? items.map(i => i.kind === 'lesson' ? i.html : `
       <div class="feed-item">
         <div class="avatar">▶</div>
         <div class="feed-body">
