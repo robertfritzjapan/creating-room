@@ -612,6 +612,13 @@ details.sec-more .sec-body{font-size:13.5px;line-height:1.9;margin-top:8px;
     <p class="sub">見出し＋本文の自由なブロックです。本文にはURLや画像を入れられます。</p>
     <label class="form-label">見出し（任意）</label>
     <input class="form-input" id="sec-title" placeholder="例：はじめての方へ">
+    <div id="sec-tab-row" style="display:none">
+      <label class="form-label">出す場所</label>
+      <select class="form-input" id="sec-tab">
+        <option value="">基本情報</option>
+        <option value="session">セッション案内</option>
+      </select>
+    </div>
     <label class="form-label">本文（URLは自動でリンクに、画像URLだけの行は画像として表示されます）</label>
     <textarea class="form-input" id="sec-body" rows="9" placeholder="ここに自由に書けます。&#10;&#10;改行もそのまま反映されます。"></textarea>
     <div style="margin-top:10px">
@@ -798,7 +805,9 @@ const fmtMonth = d => { const [y,m]=String(d).split('-'); return isEN() ? new Da
 const isEN = () => S.profile?.lang === 'en';
 const EN = {
   'ホーム':'Home','新着フィード':'What\'s new','ピンした場所':'Pinned','未返信':'Unanswered','レッスンを出す':'Post a lesson',
-  'みんなとつくる':'Create together','つくり続ける':'Keep creating','ログアウト':'Log out','権限を見る':'My access',
+  'みんなとつくる':'Create together','ワークショップ':'Workshops','Wayのクラス':'Way classes','ログアウト':'Log out','権限を見る':'My access',
+  'なんでも窓口':'Ask anything','Creating Wayをはじめる':'Start the Creating Way','Creating ノート':'Creating Note',
+  '基本情報':'About','セッション案内':'Sessions','望む結果を創り出す':'Create the result you want',
   '管理者':'Admin','編集者':'Editor','メンバー':'Member','未所属':'—',
   '固定情報':'Info','クラス記録':'Class records','質問':'Questions','リソース':'Resources','シリーズ':'Series','Creatingノート':'Creating Note','今日をつくる':'Create Today',
   '参加者・支払い確認':'Participants','権限':'Roles',
@@ -876,10 +885,11 @@ async function start(){
     S.memberships = m.data || [];
     S.profilesCache[uid] = S.profile.display_name;
     S.firstVisit = !S.profile.display_name || S.profile.display_name.includes('@');
-    // はじめかた（entrance）は公開の部屋なので、まだ入っていなければ自動で入る（初回ログインの人が空のホームに落ちないように）
-    const entranceRoom = S.rooms.find(x => x.slug === 'entrance' && x.visibility === 'public');
-    if (entranceRoom && !isMember(entranceRoom.id)) {
-      const { error: je } = await supa.from('memberships').insert({ user_id: uid, room_id: entranceRoom.id, role: 'member' });
+    // Creating Wayをはじめる と Creating ノート は全員の共通基盤なので、公開なら自動で入る
+    const autoRooms = S.rooms.filter(x => (isEntranceRoom(x) || isNoteRoom(x)) && x.visibility === 'public' && !isMember(x.id));
+    if (autoRooms.length) {
+      const { error: je } = await supa.from('memberships')
+        .insert(autoRooms.map(x => ({ user_id: uid, room_id: x.id, role: 'member' })));
       if (!je) { const { data: mm } = await supa.from('memberships').select('*').eq('user_id', uid); S.memberships = mm || S.memberships; }
     }
     await lessonsBootstrap();   // 21 Lessons：期と自分の参加を読む（lessons.js）
@@ -889,8 +899,8 @@ async function start(){
     if (isEN() && sccp && isMember(sccp.id)) { openRoom(sccp); showTab('archive'); }   // 英語モードは SCCP のクラス記録に直行
     else if (defRoom) openRoom(defRoom);
     else if (sccp && isMember(sccp.id)) openRoom(sccp);
-    else if (S.rooms.some(x => isMember(x.id) && x.slug !== 'entrance' && x.kind !== 'tool'))
-      openRoom(S.rooms.find(x => isMember(x.id) && x.slug !== 'entrance' && x.kind !== 'tool'));  // はじめかた以外で入っている部屋のうち一番上（FBS だけの人は FBS へ）
+    else if (S.rooms.some(x => isMember(x.id) && !isEntranceRoom(x) && !isNoteRoom(x)))
+      openRoom(S.rooms.find(x => isMember(x.id) && !isEntranceRoom(x) && !isNoteRoom(x)));  // 道の案内・ノート以外で入っている部屋のうち一番上（FBS だけの人は FBS へ）
     else if (S.memberships.length) openRoom(S.rooms.find(x => isMember(x.id)));   // はじめかただけの人（新しい人）は、はじめかたへ
     else openHome();
     if (S.firstVisit) openNameModal();
@@ -927,18 +937,31 @@ function renderMe(){
   $('me-sub').textContent = top + ' · ' + t('権限を見る');
   $('logout-btn').textContent = t('ログアウト');
 }
-/* サイドバーは「みんなとつくる／つくり続ける／ひとりでつくる」の3グループ。
+/* サイドバーは「Wayのクラス／みんなとつくる／ワークショップ」の3グループ。
+   Creating Wayをはじめる（entrance）と Creating ノート（道具）は、グループより上に単独で出す。
    入れない部屋もグレーで見せる（押すと紹介ページ）。募集中の期がある部屋にはバッジ。 */
-const NAV_GROUPS = [['together','みんなとつくる'],['continue','つくり続ける']];
-const navGroupOf = r => r.kind === 'tool' ? 'hidden' : (r.nav_group || 'together');   // 道具（Creatingノートなど）は「はじめかた」のタブの中に出す
+const NAV_GROUPS = [['class','Wayのクラス'],['together','みんなとつくる'],['workshop','ワークショップ']];
+const NAV_KEYS = NAV_GROUPS.map(g => g[0]);
+const isNoteRoom = r => !!r && r.kind === 'tool';                                     // Creating ノート（緊張構造チャートの部屋）
+const isEntranceRoom = r => !!r && r.slug === 'entrance';                             // Creating Wayをはじめる
+/* nav_group が新しい値でない部屋は「みんなとつくる」に置く（データ移行が済むまでの受け皿）。
+   'hidden' の部屋（創造プロセス倶楽部など）はメニューに出さないが、データは残る。 */
+const navGroupOf = r => (isNoteRoom(r) || isEntranceRoom(r)) ? 'hidden'
+  : r.nav_group === 'hidden' ? 'hidden'
+  : NAV_KEYS.includes(r.nav_group) ? r.nav_group : 'together';
 function renderNav(){
-  const entrance = S.rooms.find(r => r.slug === 'entrance' && isMember(r.id));
+  const entrance = S.rooms.find(r => isEntranceRoom(r) && isMember(r.id));
+  const note = S.rooms.find(r => isNoteRoom(r) && isMember(r.id));
   let h = `<div class="nav-label">${t('ホーム')}</div>
     <div class="nav-item" data-nav="home"><span class="dot"></span>${t('新着フィード')}</div>`;
-  if (entrance) h += `<div class="nav-item" data-nav="${entrance.id}"><span class="dot"></span>${esc(t(entrance.name))}</div>`;
+  if (entrance) h += `<div class="nav-item" data-nav="inbox"><span class="dot"></span>${t('なんでも窓口')}</div>`;
   h += `<div class="nav-item" data-nav="pins"><span class="dot"></span>${t('ピンした場所')}</div>`;
+  // 道そのもの。カテゴリの見出しを付けず、ホームのすぐ下に置く
+  if (entrance || note) h += `<div style="height:12px"></div>`;
+  if (entrance) h += `<div class="nav-item" data-nav="${entrance.id}"><span class="dot"></span>${esc(t(entrance.name))}</div>`;
+  if (note) h += `<div class="nav-item" data-nav="${note.id}"><span class="dot"></span>${esc(t(note.name))}</div>`;
   NAV_GROUPS.forEach(([key, label]) => {
-    const rooms = S.rooms.filter(r => r.slug !== 'entrance' && navGroupOf(r) === key);
+    const rooms = S.rooms.filter(r => navGroupOf(r) === key);
     if (!rooms.length) return;
     h += `<div class="nav-label">${t(label)}</div>` + rooms.map(r => {
       const member = isMember(r.id);
@@ -954,6 +977,7 @@ function renderNav(){
     closeSidebar();
     const k = el.dataset.nav;
     if (k === 'home') openHome();
+    else if (k === 'inbox') openInbox();
     else if (k === 'pins') openPinsPage();
     else openRoom(S.rooms.find(r => r.id === k));
   });
@@ -962,7 +986,7 @@ function renderNav(){
 }
 function highlightNav(){
   const t = S.current?.type;
-  const key = t === 'home' ? 'home' : t === 'pins' ? 'pins' : t === 'queue' ? 'queue' : t === 'post' ? 'post' : (S.current?.host?.id || S.current?.room?.id);
+  const key = t === 'home' ? 'home' : t === 'inbox' ? 'inbox' : t === 'pins' ? 'pins' : t === 'queue' ? 'queue' : t === 'post' ? 'post' : (S.current?.host?.id || S.current?.room?.id);
   $('nav').querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.nav === key));
 }
 async function joinPublicRoom(roomId){
@@ -1008,19 +1032,36 @@ function openRoom(room){
   S.current = { type:'room', room };
   $('room-title').textContent = t(room.name);
   updatePinBtn();
-  // はじめかた（entrance）は固定情報とリソースだけ。他の部屋は従来どおり
-  const toolRoom = S.rooms.find(r => r.kind === 'tool');       // 道具の部屋。名前を変えるとタブ名も変わる
-  const tabs = room.slug === 'entrance'
-    ? [['pinned','固定情報'],['chat','質問'],['note', toolRoom?.name || '今日をつくる'],['resources','リソース']]
-    : (room.kind === 'tool' || navGroupOf(room) === 'continue')   // 道具と「つくり続ける」の部屋は単発なのでクラス記録なし
+  // Creating Wayをはじめる（entrance）は道の案内。質問は「なんでも窓口」へ移したのでタブには出さない。
+  // Creating ノート（道具）は、開いたらすぐチャートを書ける画面から始める。
+  const tabs = isEntranceRoom(room)
+    ? [['pinned','基本情報'],['session','セッション案内'],['resources','リソース']]
+    : isNoteRoom(room)
+    ? [['chart','望む結果を創り出す'],['pinned','固定情報'],['resources','リソース']]
+    : navGroupOf(room) === 'class'                                 // Wayのクラスは毎回の集まりなのでクラス記録なし
     ? [['pinned','固定情報'],['chat','質問'],['resources','リソース']]
     : [['pinned','固定情報'],['archive','クラス記録'],['chat','質問'],['resources','リソース']];
-  if (roleIn(room.id) === 'admin') tabs.push(['members','メンバー']);   // 管理者だけ。はじめかたでは「誰がここまで来ているか」の一覧になる
+  if (roleIn(room.id) === 'admin') tabs.push(['members','メンバー']);   // 管理者だけ。entrance では「誰がここまで来ているか」の一覧になる
   $('tabs').innerHTML = tabs.map(([k,label]) =>
     `<div class="tab" data-tab="${k}">${t(label)}</div>`).join('');
   $('tabs').querySelectorAll('.tab').forEach(el => el.onclick = () => showTab(el.dataset.tab));
   highlightNav();
-  showTab('pinned');
+  showTab(tabs[0][0]);
+}
+
+/* ===== なんでも窓口（ホーム直下）=====
+   中身は entrance ルームの inquiries。部屋を開かずに、いつでも書ける場所として出す。 */
+function openInbox(){
+  const entrance = S.rooms.find(r => isEntranceRoom(r) && isMember(r.id));
+  if (!entrance) return openHome();
+  leaveChat();
+  S.current = { type:'inbox', room: entrance };
+  $('room-title').textContent = t('なんでも窓口');
+  updatePinBtn();
+  $('tabs').innerHTML = '';
+  S.tab = 'chat';
+  highlightNav();
+  renderChat();
 }
 
 /* 紹介ページ・21 Lessons の中身は lessons.js にあります */
@@ -1028,14 +1069,9 @@ function showTab(tab){
   if (S.tab === 'chat' && tab !== 'chat') leaveChat();
   S.tab = tab;
   $('tabs').querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
-  // はじめかたの中の「Creatingノート」タブ：道具の部屋の固定情報を、はじめかたの中に出す
   if (S.current.host) { S.current = { type:'room', room: S.current.host }; }
-  if (tab === 'note') {
-    const noteRoom = S.rooms.find(r => r.kind === 'tool');
-    if (noteRoom) S.current = { type:'room', room: noteRoom, host: S.current.room };
-    renderNote(!!noteRoom);
-    return;
-  }
+  if (tab === 'chart') { renderNote(true); return; }              // Creating ノート：チャートを書く画面
+  if (tab === 'session') { renderPinned({ secTab:'session' }); return; }   // セッション案内
   ({pinned:renderPinned, archive:renderArchive, chat:renderChat, resources:renderResources, members:renderMembers})[tab]();
 }
 
@@ -1088,7 +1124,7 @@ async function renderNote(hasRoom){
   page.innerHTML = '';
   if (hasRoom) {
     try { await renderPinned({ fold:true }); } catch (e) { page.innerHTML = ''; }
-    if (S.tab !== 'note') return;                                  // 読み込み中にタブが変わっていたら描かない
+    if (S.tab !== 'chart') return;                                 // 読み込み中にタブが変わっていたら描かない
     const only = page.children.length === 1 ? page.querySelector('.empty') : null;
     if (only && /固定情報はまだありません/.test(only.textContent)) page.innerHTML = '';   // 空の見出しは出さない
   }
@@ -1239,7 +1275,7 @@ function richText(t){
   }).join('<br>');
 }
 /* 固定情報を描き直す。Creatingノートのタブにいるときは、タブごと描き直してノートを保ち直す */
-const repaintPinned = () => (S.tab === 'note' ? showTab('note') : renderPinned());
+const repaintPinned = () => (S.tab === 'chart' ? showTab('chart') : S.tab === 'session' ? showTab('session') : renderPinned());
 
 /* コピー枠のボタンを効かせる。固定情報でもリソースでも使う */
 function bindCopyBoxes(root){
@@ -1262,7 +1298,10 @@ async function renderPinned(opts = {}){
   const room = S.current.room;
   const p = room.pinned || {};
   const editor = canEdit(room.id);
-  const fold = !!opts.fold;   // true のとき、セクションを折りたたみ（Creatingノートのタブ）
+  const fold = !!opts.fold;   // true のとき、セクションを折りたたみ（Creating ノートのチャート画面）
+  const secTab = opts.secTab || '';   // '' = 基本情報 / 'session' = セッション案内
+  const bare = !!secTab;              // セッション案内には Zoom・受付・カレンダーを出さない
+  S.secTabTarget = secTab;            // 「＋ セクションを追加」がどのタブに足すか
 
   // 参加希望の受付（signups）を取得。テーブル未作成やエラー時はセクションごとスキップ
   let sgs = [], sgResp = [];
@@ -1281,26 +1320,26 @@ async function renderPinned(opts = {}){
   }
   if (S.current.room !== room) return;   // 読み込み中にルームが変わったら破棄
   let h = editor ? `<div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
-      <button class="add-res-btn" style="margin-bottom:0" id="edit-info">✏️ 基本情報を編集</button>
+      ${bare ? '' : `<button class="add-res-btn" style="margin-bottom:0" id="edit-info">✏️ 基本情報を編集</button>`}
       <button class="add-res-btn" style="margin-bottom:0" id="add-sec">＋ セクションを追加</button>
     </div>` : '';
   // 「今日をつくる」のタブは、チャート・受付・セクションだけにする。
   // Zoom・コンタクト・スケジュール・カレンダーは、部屋の固定情報としては残るが、このタブには出さない。
   const half = [];
-  if (!fold && p.zoom && (p.zoom.meeting_id || p.zoom.url)) {
+  if (!fold && !bare && p.zoom && (p.zoom.meeting_id || p.zoom.url)) {
     half.push(`<div class="card"><h3><span class="bar"></span>Zoom</h3>
       ${p.zoom.meeting_id ? `<div class="kv"><b>Meeting ID</b>${esc(p.zoom.meeting_id)}</div>` : ''}
       ${p.zoom.passcode ? `<div class="kv"><b>Passcode</b>${esc(p.zoom.passcode)}</div>` : ''}
       ${p.zoom.url ? `<a class="zoom-btn" href="${esc(p.zoom.url)}" target="_blank" rel="noopener">${t('Zoomに参加する')}</a>` : ''}
     </div>`);
   }
-  if (!fold && p.contacts?.length) {
+  if (!fold && !bare && p.contacts?.length) {
     half.push(`<div class="card"><h3><span class="bar"></span>${t('コンタクト')}</h3>
       ${p.contacts.map(c => `<div class="kv"><b>${esc(c.label)}</b>${esc(c.value)}</div>`).join('')}
     </div>`);
   }
   // 参加希望の受付は、その日に動くもの。Zoom やスケジュールより先に出す
-  if (!sgErr && (sgs.length || editor) && room.slug !== 'entrance') {   // はじめかた本体には出さない（Creatingノートのタブ側にある）
+  if (!sgErr && !bare && (sgs.length || editor) && !isEntranceRoom(room)) {   // はじめかた本体には出さない（Creatingノートのタブ側にある）
     h += `<div class="card sg-card"><h3><span class="bar"></span>🙋 ${esc(p.signup_title || '参加希望の受付')}${editor ? `<span style="margin-left:auto"><button class="res-del" id="add-signup" title="受付を追加">＋ 追加</button></span>` : ''}</h3>
       ${sgs.length ? sgs.map(s => {
         const rs = sgResp.filter(r => r.signup_id === s.id);
@@ -1316,15 +1355,15 @@ async function renderPinned(opts = {}){
     </div>`;
   }
   if (half.length) h += `<div class="info-grid">${half.join('')}</div>`;
-  if (!fold && p.schedule?.length) {
+  if (!fold && !bare && p.schedule?.length) {
     h += `<div class="card"><h3><span class="bar"></span>${esc(p.schedule_title || 'スケジュール')}</h3>
       <ul class="sched">${p.schedule.map(s => `<li>${esc(s)}</li>`).join('')}</ul>
       ${p.note ? `<p class="muted" style="margin-top:10px">${esc(p.note)}</p>` : ''}
     </div>`;
-  } else if (!fold && p.note) {
+  } else if (!fold && !bare && p.note) {
     h += `<div class="card"><p style="font-size:13px">${esc(p.note)}</p></div>`;
   }
-  const gcalIds = fold ? [] : (Array.isArray(p.gcal) ? p.gcal : [p.gcal]).filter(Boolean);
+  const gcalIds = (fold || bare) ? [] : (Array.isArray(p.gcal) ? p.gcal : [p.gcal]).filter(Boolean);
   if (gcalIds.length) {
     const gmode = window.innerWidth < 600 ? 'AGENDA' : 'MONTH';
     const gsrc = 'https://calendar.google.com/calendar/embed?'
@@ -1334,7 +1373,9 @@ async function renderPinned(opts = {}){
       <div class="gcal-wrap"><iframe src="${gsrc}" loading="lazy" title="ルームカレンダー"></iframe></div>
     </div>`;
   }
-  (p.sections || []).forEach((s, idx) => {
+  (p.sections || []).map((s, idx) => [s, idx])
+    .filter(([s]) => ((s && s.tab) || '') === secTab)
+    .forEach(([s, idx]) => {
     if (fold) {
       // Creatingノートのタブ：本文の1行目だけをカードに出し、残りは「くわしく」の中に畳む
       const lines = (s.body || '').split('\n').filter(l => l.trim() !== '[チャート]');
@@ -1359,7 +1400,7 @@ async function renderPinned(opts = {}){
       <div style="font-size:13.5px">${richText(s.body)}</div>
     </div>`;
   });
-  $('page').innerHTML = h || `<div class="empty">固定情報はまだありません</div>`;
+  $('page').innerHTML = h || `<div class="empty">${bare ? 'ご案内はまだありません' : t('固定情報はまだありません')}</div>`;
   bindCopyBoxes($('page'));
   const ei = $('edit-info'); if (ei) ei.onclick = openInfoModal;
   const as = $('add-sec'); if (as) as.onclick = () => openSecModal(null);
@@ -1463,6 +1504,10 @@ function openSecModal(idx){
   $('sec-modal-title').textContent = s ? 'セクションを編集' : 'セクションを追加';
   $('sec-title').value = s?.title || '';
   $('sec-body').value = s?.body || '';
+  // Creating Wayをはじめる だけ、基本情報とセッション案内のどちらに出すかを選べる
+  const canPick = isEntranceRoom(S.current.room);
+  $('sec-tab-row').style.display = canPick ? 'block' : 'none';
+  $('sec-tab').value = s ? (s.tab || '') : (S.secTabTarget || '');
   $('sec-img-status').textContent = '';
   $('sec-modal').style.display = 'flex';
 }
@@ -1485,12 +1530,14 @@ $('sec-save').onclick = async () => {
   const title = $('sec-title').value.trim();
   const body = $('sec-body').value.trim();
   if (!title && !body) return toast('見出しか本文のどちらかは入力してください');
+  const secTab = isEntranceRoom(S.current.room) ? ($('sec-tab').value || '') : (S.secTabTarget || '');
   const pinned = structuredClone(S.current.room.pinned || {});
   pinned.sections = pinned.sections || [];
+  const row = secTab ? { title, body, tab: secTab } : { title, body };
   if (S.editingSecIdx !== null && pinned.sections[S.editingSecIdx]) {
-    pinned.sections[S.editingSecIdx] = { title, body };
+    pinned.sections[S.editingSecIdx] = row;
   } else {
-    pinned.sections.push({ title, body });
+    pinned.sections.push(row);
   }
   if (await savePinned(pinned)) {
     $('sec-modal').style.display = 'none';
@@ -1630,12 +1677,15 @@ async function renderChat(){
     return new Date(lb) - new Date(la);
   });
 
+  const inbox = S.current.type === 'inbox';
   const newFormHtml = !isAdmin ? `
     <div class="card q-new">
-      <h3><span class="bar"></span>事務局に質問する</h3>
-      <p class="sub">ここで送った質問は、あなたと事務局だけが見られます。</p>
-      <textarea class="form-input" id="q-new-body" rows="3" placeholder="聞きたいことを書いてください"></textarea>
-      <button class="primary-btn" style="margin-top:10px" id="q-new-send">質問を送る</button>
+      <h3><span class="bar"></span>${inbox ? '事務局に送る' : '事務局に質問する'}</h3>
+      <p class="sub">${inbox
+        ? 'ご質問、ご要望、感想、体験セッションのご希望など、なんでもどうぞ。ここに書いたことは、あなたと事務局だけが見られます。'
+        : 'ここで送った質問は、あなたと事務局だけが見られます。'}</p>
+      <textarea class="form-input" id="q-new-body" rows="3" placeholder="${inbox ? '書きかけでも大丈夫です' : '聞きたいことを書いてください'}"></textarea>
+      <button class="primary-btn" style="margin-top:10px" id="q-new-send">${inbox ? '送る' : '質問を送る'}</button>
     </div>` : '';
 
   const listHtml = sorted.length
@@ -1743,7 +1793,7 @@ async function renderResources(){
   const isEditor = canEdit(roomId);
   S.toolsCache = toolData || [];
   const toolAddBtn = `<button class="add-res-btn" id="add-tool">＋ ツールを追加</button>`;
-  const noTools = S.current.room.slug === 'entrance' || S.current.room.kind === 'tool' || navGroupOf(S.current.room) === 'continue';   // はじめかた・道具・つくり続けるには「みんなのツール」を出さない
+  const noTools = isEntranceRoom(S.current.room) || isNoteRoom(S.current.room) || navGroupOf(S.current.room) === 'class';   // 道の案内・ノート・Wayのクラスには「みんなのツール」を出さない
   const toolSection = noTools ? '' : `<div class="card tool-section"><h3><span class="bar"></span>🛠 みんなのツール<span class="tool-badge">投稿大歓迎</span></h3>
     <p class="tool-note">ここはメンバーのみなさんが参加できるコーナーです。ツールの登録も、使ってみた感想（使い手の声）の投稿も、自由にどうぞ。</p>
     ${toolAddBtn}
