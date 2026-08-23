@@ -1034,13 +1034,16 @@ function openRoom(room){
   updatePinBtn();
   // Creating Wayをはじめる（entrance）は道の案内。質問は「なんでも窓口」へ移したのでタブには出さない。
   // Creating ノート（道具）は、開いたらすぐチャートを書ける画面から始める。
+  // 質問は「なんでも窓口」に一本化した。回ごとに質問が要る 21 Lessons だけ、部屋の中に残す。
+  // 管理者には全部屋で出す（過去に届いた質問を読み返せるように）。
+  const showChat = room.slug === 'lessons21' || roleIn(room.id) === 'admin';
   const tabs = isEntranceRoom(room)
     ? [['pinned','基本情報'],['session','セッション案内'],['resources','リソース']]
     : isNoteRoom(room)
     ? [['chart','望む結果を創り出す'],['pinned','固定情報'],['resources','リソース']]
     : navGroupOf(room) === 'class'                                 // Wayのクラスは毎回の集まりなのでクラス記録なし
-    ? [['pinned','固定情報'],['chat','質問'],['resources','リソース']]
-    : [['pinned','固定情報'],['archive','クラス記録'],['chat','質問'],['resources','リソース']];
+    ? [['pinned','固定情報'],...(showChat ? [['chat','質問']] : []),['resources','リソース']]
+    : [['pinned','固定情報'],['archive','クラス記録'],...(showChat ? [['chat','質問']] : []),['resources','リソース']];
   if (roleIn(room.id) === 'admin') tabs.push(['members','メンバー']);   // 管理者だけ。entrance では「誰がここまで来ているか」の一覧になる
   $('tabs').innerHTML = tabs.map(([k,label]) =>
     `<div class="tab" data-tab="${k}">${t(label)}</div>`).join('');
@@ -1267,8 +1270,12 @@ async function renderNote(hasRoom){
 function richText(t){
   return esc(t || '').split('\n').map(line => {
     const l = line.trim();
+    if (/^https?:\/\/\S+$/.test(l) && /\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(l)) {
+      return `<video src="${l}" controls playsinline preload="metadata" style="max-width:100%;border-radius:8px;margin:8px 0"></video>`;
+    }
     if (/^https?:\/\/\S+$/.test(l) &&
-        (/\.(png|jpe?g|gif|webp|svg)(\?|#|$)/i.test(l) || l.includes('/room-media/'))) {
+        (/\.(png|jpe?g|gif|webp|svg)(\?|#|$)/i.test(l) ||
+         (l.includes('/room-media/') && !/\.(pdf|docx?|xlsx?|pptx?|zip|html?|csv|txt)(\?|#|$)/i.test(l)))) {
       return `<img src="${l}" alt="" style="max-width:100%;border-radius:8px;margin:8px 0" loading="lazy">`;
     }
     return line.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
