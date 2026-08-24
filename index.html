@@ -1040,7 +1040,7 @@ function openRoom(room){
     ? [['pinned','基本情報'],['session','セッション案内'],['resources','リソース']]
     : isNoteRoom(room)
     ? [['chart','望む結果を創り出す'],['pinned','固定情報'],['resources','リソース']]
-    : navGroupOf(room) === 'class'                                 // Wayのクラスは毎回の集まりなのでクラス記録なし
+    : (navGroupOf(room) === 'class' || navGroupOf(room) === 'workshop')   // Wayのクラスと単発ワークショップはクラス記録なし
     ? [['pinned','固定情報'],...(showChat ? [['chat','質問']] : []),['resources','リソース']]
     : [['pinned','固定情報'],['archive','クラス記録'],...(showChat ? [['chat','質問']] : []),['resources','リソース']];
   if (roleIn(room.id) === 'admin') tabs.push(['members','メンバー']);   // 管理者だけ。entrance では「誰がここまで来ているか」の一覧になる
@@ -1188,7 +1188,7 @@ async function renderNote(hasRoom){
       </div>
       <div class="cn-saveinfo" id="cn-saved">書いたものは自動で保存されます</div>
       <div class="cn-foot">
-        この端末のブラウザにだけ保存されます。履歴やサイトデータを消すと、ノートも消えます。
+        ここに書いたものは、この端末のブラウザのキャッシュに保存されているだけです。他の人が見ることはできません。ご自身の別の端末からも見られません。キャッシュを消すと、書いたものも一緒に消えます。残しておきたいときは「全部をコピー」で控えを取ってください。
       </div>
       ${pastKeys.length ? `<details class="cn-details"><summary>これまでのページ（${pastKeys.length}日）</summary>
         ${pastKeys.slice().reverse().map(k => {
@@ -1345,7 +1345,7 @@ async function renderPinned(opts = {}){
     </div>`);
   }
   // 参加希望の受付は、その日に動くもの。Zoom やスケジュールより先に出す
-  if (!sgErr && !bare && (sgs.length || editor) && !isEntranceRoom(room)) {   // はじめかた本体には出さない（Creatingノートのタブ側にある）
+  if (!sgErr && !fold && !bare && (sgs.length || editor) && !isEntranceRoom(room)) {   // チャート画面には出さない（Creating ノートの固定情報タブ側にある）
     h += `<div class="card sg-card"><h3><span class="bar"></span>🙋 ${esc(p.signup_title || '参加希望の受付')}${editor ? `<span style="margin-left:auto"><button class="res-del" id="add-signup" title="受付を追加">＋ 追加</button></span>` : ''}</h3>
       ${sgs.length ? sgs.map(s => {
         const rs = sgResp.filter(r => r.signup_id === s.id);
@@ -1799,7 +1799,7 @@ async function renderResources(){
   const isEditor = canEdit(roomId);
   S.toolsCache = toolData || [];
   const toolAddBtn = `<button class="add-res-btn" id="add-tool">＋ ツールを追加</button>`;
-  const noTools = isEntranceRoom(S.current.room) || isNoteRoom(S.current.room) || navGroupOf(S.current.room) === 'class';   // 道の案内・ノート・Wayのクラスには「みんなのツール」を出さない
+  const noTools = isEntranceRoom(S.current.room) || isNoteRoom(S.current.room) || ['class','workshop'].includes(navGroupOf(S.current.room));   // 道の案内・ノート・Wayのクラス・ワークショップには「みんなのツール」を出さない
   const toolSection = noTools ? '' : `<div class="card tool-section"><h3><span class="bar"></span>🛠 みんなのツール<span class="tool-badge">投稿大歓迎</span></h3>
     <p class="tool-note">ここはメンバーのみなさんが参加できるコーナーです。ツールの登録も、使ってみた感想（使い手の声）の投稿も、自由にどうぞ。</p>
     ${toolAddBtn}
