@@ -1383,11 +1383,14 @@ async function renderPinned(opts = {}){
   }
   (p.sections || []).map((s, idx) => [s, idx])
     .filter(([s]) => ((s && s.tab) || '') === secTab)
+    // 本文に [チャート] と書いた行があるセクションは「望む結果を創り出す」タブ専用。
+    // 固定情報タブには出さない（同じ説明が2箇所に出ないように）
+    .filter(([s]) => /^\s*\[チャート\]\s*$/m.test(s.body || '') === fold)
     .forEach(([s, idx]) => {
     if (fold) {
-      // Creatingノートのタブ：本文の1行目だけをカードに出し、残りは「くわしく」の中に畳む
+      // チャート画面：本文の1行目だけをカードに出し、残りは「くわしく」の中に畳む
       const lines = (s.body || '').split('\n').filter(l => l.trim() !== '[チャート]');
-      const isHost = /^\s*\[チャート\]\s*$/m.test(s.body || '');
+      const isHost = true;
       const i0 = lines.findIndex(l => l.trim());
       const lead = i0 >= 0 ? lines[i0] : '';
       const rest = i0 >= 0 ? lines.slice(i0 + 1).join('\n').replace(/^\s*\n/, '') : '';
