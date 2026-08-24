@@ -1277,7 +1277,9 @@ function richText(t){
          (l.includes('/room-media/') && !/\.(pdf|docx?|xlsx?|pptx?|zip|html?|csv|txt)(\?|#|$)/i.test(l)))) {
       return `<img src="${l}" alt="" style="max-width:100%;border-radius:8px;margin:8px 0" loading="lazy">`;
     }
-    return line.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+    return line
+      .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>')
+      .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');   // **はさむ** で太字
   }).join('<br>');
 }
 /* 固定情報を描き直す。Creatingノートのタブにいるときは、タブごと描き直してノートを保ち直す */
