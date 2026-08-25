@@ -1889,7 +1889,7 @@ async function renderResources(){
             ${atts.length ? `<div class="vid-atts" style="margin-top:5px">${atts.map(a =>
               `<a class="vid-att" href="${esc(fileHref(a))}" target="_blank" rel="noopener">📎 ${esc(a.name)}</a>`).join('')}</div>` : ''}</div>`;
           })()}
-            ${isEditor ? `<button class="res-del" data-redit="${r.id}" title="編集">✏️</button><button class="res-del" data-del="${r.id}" title="削除">✕</button>` : ''}
+            ${isEditor ? `<button class="res-del" data-rup="${r.id}" title="上へ">↑</button><button class="res-del" data-rdown="${r.id}" title="下へ">↓</button><button class="res-del" data-redit="${r.id}" title="編集">✏️</button><button class="res-del" data-del="${r.id}" title="削除">✕</button>` : ''}
           </div>`).join('')}
       </div>`).join('');
   }
@@ -1942,6 +1942,26 @@ async function renderResources(){
     if (e.target.closest('a, button')) return;
     window.open(el.dataset.open, '_blank', 'noopener');
   });
+  // 上へ／下へ。同じカテゴリの中で入れ替える。
+  // 既存データは sort_order が全部 100 なので、最初の移動でまとめて振り直す
+  const moveRes = async (id, dir) => {
+    const groups = {};
+    S.resCache.forEach(r => (groups[r.category] = groups[r.category] || []).push(r));
+    const flat = Object.values(groups).flat();
+    const g = groups[S.resCache.find(r => r.id === id)?.category] || [];
+    const at = g.findIndex(r => r.id === id);
+    if (at < 0 || !g[at + dir]) return;
+    const other = g[at + dir];
+    const ia = flat.findIndex(r => r.id === id), ib = flat.findIndex(r => r.id === other.id);
+    [flat[ia], flat[ib]] = [flat[ib], flat[ia]];
+    const ups = flat.map((r, i) => ({ r, n: (i + 1) * 10 })).filter(({ r, n }) => r.sort_order !== n);
+    const res = await Promise.all(ups.map(({ r, n }) =>
+      supa.from('resources').update({ sort_order: n }).eq('id', r.id)));
+    if (res.some(x => x.error)) return toast('並べ替えできませんでした');
+    renderResources();
+  };
+  $('page').querySelectorAll('[data-rup]').forEach(el => el.onclick = () => moveRes(el.dataset.rup, -1));
+  $('page').querySelectorAll('[data-rdown]').forEach(el => el.onclick = () => moveRes(el.dataset.rdown, 1));
   $('page').querySelectorAll('[data-redit]').forEach(el => el.onclick = e => {
     e.preventDefault(); e.stopPropagation();
     openResModal((S.resCache || []).find(r => r.id === el.dataset.redit) || null);
@@ -2187,7 +2207,8 @@ $('res-save').onclick = async () => {
   };
   const q = S.editingRes
     ? supa.from('resources').update(row).eq('id', S.editingRes.id)
-    : supa.from('resources').insert({ ...row, room_id: S.current.room.id, sort_order: 100 });
+    : supa.from('resources').insert({ ...row, room_id: S.current.room.id,
+        sort_order: Math.max(0, ...(S.resCache || []).map(r => r.sort_order || 0)) + 10 });
   const { error } = await q;
   if (error) return toast('保存に失敗しました：' + error.message);
   $('res-modal').style.display = 'none';
