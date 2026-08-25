@@ -190,7 +190,7 @@ function openLessonsRoom(room, tab){
   S.current = { type:'room', room };
   $('room-title').textContent = room.name;
   updatePinBtn();
-  const tabs = [['series','シリーズ'],['pinned','固定情報']];
+  const tabs = [['series','シリーズ'],['pinned','基本情報']];
   if (canEdit(room.id)) tabs.push(['cmembers','参加者・支払い確認']);
   if (roleIn(room.id) === 'admin') tabs.push(['members','権限']);
   $('tabs').innerHTML = tabs.map(([k,label]) => `<div class="tab" data-tab="${k}">${t(label)}</div>`).join('');
