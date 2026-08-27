@@ -504,7 +504,7 @@ async function openLesson(l, opts = {}){
       <div class="ctext ${del ? 'cdel' : ''}">${del ? '（削除されました）' : nl2br(x.body)}</div>
       ${del ? '' : `<div class="ctools">
         <button data-clike="${x.id}" class="${liked ? 'on' : ''}">♡ ${my.length || ''} いいね</button>
-        ${!x.parent_id ? `<button data-creply="${x.id}">↩ 返信</button>` : ''}
+        <button data-creply="${x.parent_id || x.id}">↩ 返信</button>
         <button data-cpin="${x.id}" class="${cp ? 'on' : ''}">${cp ? '★ ピン済み' : '☆ ピン'}</button>
         ${(mine || editor) ? `<button data-cdel="${x.id}">削除</button>` : ''}
       </div>`}
@@ -512,7 +512,8 @@ async function openLesson(l, opts = {}){
   };
   const threadHtml = top.length ? top.map(x => {
     const rs = replies(x.id);
-    const unans = editor && !x.deleted_at && !rs.some(r => editors.includes(r.user_id)) && !editors.includes(x.user_id);
+    const lastMsg = [x, ...rs].filter(m => !m.deleted_at).pop();
+    const unans = editor && lastMsg && !editors.includes(lastMsg.user_id);
     return `<div class="cm" id="c-${x.id}">
       <div class="avatar cav">${esc(initialOf(S.profilesCache[x.user_id]))}</div>
       <div style="flex:1;min-width:0">
@@ -698,9 +699,12 @@ async function fetchQueue(){
   const roomIds = [...new Set(cs.map(c => c.room_id))];
   const eds = new Set();
   for (const rid of roomIds) (await editorIdsFor(rid)).forEach(id => eds.add(id));
-  return comments.filter(x => !x.parent_id && !eds.has(x.user_id)
-      && !comments.some(r => r.parent_id === x.id && eds.has(r.user_id)))
-    .map(x => ({ c: x, lesson: lessons.find(l => l.id === x.lesson_id) }));
+  // 会話（根＋返信）ごとに見て、最後の発言が参加者なら未返信
+  return comments.filter(x => !x.parent_id).filter(x => {
+      const thread = [x, ...comments.filter(r => r.parent_id === x.id)];
+      const last = thread[thread.length - 1];
+      return !eds.has(last.user_id);
+    }).map(x => ({ c: x, lesson: lessons.find(l => l.id === x.lesson_id) }));
 }
 /* ⭕️を押したとき：一覧を挟まず、一番古い未返信コメントの場所を開き、返信欄を出す。
    afterLessonId を渡すと、同じ回に残りがあればそれを優先する（続けて返すときに画面が飛ばない）。 */
