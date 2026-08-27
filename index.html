@@ -1598,6 +1598,23 @@ $('sec-img-file').onchange = async () => {
   $('sec-img-status').textContent = '✓ 挿入しました';
   $('sec-img-file').value = '';
 };
+/* 期の紹介の画像。セクションと同じく、読み込み時に一度だけ付ける */
+$('ch-img-btn').onclick = () => $('ch-img-file').click();
+$('ch-img-file').onchange = async () => {
+  const file = $('ch-img-file').files[0];
+  if (!file) return;
+  $('ch-img-status').textContent = 'アップロード中…';
+  const slug = S.current?.room?.slug || 'cohort';
+  const path = `${slug}/${Date.now()}-${file.name.replace(/[^\w.\-]+/g, '_')}`;
+  const { error } = await supa.storage.from('room-media').upload(path, file);
+  if (error) { $('ch-img-status').textContent = ''; return toast('画像のアップロードに失敗しました：' + error.message); }
+  const { data } = supa.storage.from('room-media').getPublicUrl(path);
+  const ta = $('ch-intro');
+  ta.value = (ta.value ? ta.value.replace(/\n*$/, '\n\n') : '') + data.publicUrl + '\n';
+  $('ch-img-status').textContent = '✓ 挿入しました';
+  $('ch-img-file').value = '';
+};
+
 $('sec-save').onclick = async () => {
   const title = $('sec-title').value.trim();
   const body = $('sec-body').value.trim();

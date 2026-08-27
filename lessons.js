@@ -838,22 +838,9 @@ function openCohortModal(c, room){
   $('ch-modal-title').textContent = c ? '期を編集' : '期を作る';
   $('ch-name').value = c?.name || '';
   $('ch-period').value = c?.period_label || '';
-  $('ch-intro').value = c?.intro || '';
-  $('ch-img-status').textContent = '';
-  $('ch-img-btn').onclick = () => $('ch-img-file').click();
-  $('ch-img-file').onchange = async () => {
-    const file = $('ch-img-file').files[0];
-    if (!file) return;
-    $('ch-img-status').textContent = 'アップロード中…';
-    const path = `${room.slug}/${Date.now()}-${file.name.replace(/[^\w.\-]+/g, '_')}`;
-    const { error } = await supa.storage.from('room-media').upload(path, file);
-    if (error) { $('ch-img-status').textContent = ''; return toast('画像のアップロードに失敗しました：' + error.message); }
-    const { data } = supa.storage.from('room-media').getPublicUrl(path);
-    const ta = $('ch-intro');
-    ta.value = (ta.value ? ta.value.replace(/\n*$/, '\n\n') : '') + data.publicUrl + '\n';
-    $('ch-img-status').textContent = '✓ 挿入しました';
-    $('ch-img-file').value = '';
-  };
+  // index.html が古いままでも、モーダル自体は開けるようにしておく
+  const introEl = $('ch-intro'); if (introEl) introEl.value = c?.intro || '';
+  const imgSt = $('ch-img-status'); if (imgSt) imgSt.textContent = '';
   $('ch-starts').value = c?.starts_on || '';
   $('ch-total').value = c?.total_sessions || 21;
   $('ch-from').value = c?.intake_from || '';
@@ -870,7 +857,7 @@ function openCohortModal(c, room){
     const name = $('ch-name').value.trim();
     if (!name) return toast('名前は必須です');
     const row = { room_id: room.id, name, period_label: $('ch-period').value.trim() || null,
-      intro: $('ch-intro').value.trim() || null, starts_on: $('ch-starts').value || null,
+      intro: ($('ch-intro')?.value || '').trim() || null, starts_on: $('ch-starts').value || null,
       total_sessions: Number($('ch-total').value) || 21, intake_from: $('ch-from').value || null, intake_to: $('ch-to').value || null,
       price_jpy: $('ch-price').value === '' ? null : Number($('ch-price').value), payment_url: $('ch-payurl').value.trim() || null,
       payment_info: $('ch-payinfo').value.trim() || null, status: $('ch-status').value,
