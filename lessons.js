@@ -44,7 +44,7 @@ async function lessonsBootstrap(){
   L.myCM = m.data || [];
   L.editorRooms = S.memberships.filter(x => ['admin','editor'].includes(x.role)).map(x => x.room_id);
   L.postDraft = null;
-  if (editorOfLessons()) refreshQueueCount(); else refreshReplyCount();
+  if (editorOfLessons()) refreshQueueCount(); else refreshActivityCount();
 }
 const editorOfLessons = () => S.rooms.some(r => isLessonsRoom(r) && canEdit(r.id));
 const editorCohorts = () => L.cohorts.filter(c => canEditCohort(c));
@@ -56,38 +56,6 @@ async function refreshQueueCount(){
   return L.queueCount;
 }
 
-/* ---------- 参加者：自分のコメントに付いた返信（見たものは端末に覚える） ---------- */
-const seenRepliesKey = () => 'cr_seen_replies_' + S.user.id;
-const seenReplies = () => { try { return new Set(JSON.parse(localStorage.getItem(seenRepliesKey()) || '[]')); } catch { return new Set(); } };
-const markRepliesSeen = ids => {
-  if (!ids.length) return;
-  const st = seenReplies(); ids.forEach(id => st.add(id));
-  localStorage.setItem(seenRepliesKey(), JSON.stringify([...st].slice(-500)));
-};
-async function fetchUnseenReplies(){
-  const { data: mine } = await supa.from('lesson_comments').select('id, lesson_id').eq('user_id', S.user.id).is('parent_id', null);
-  if (!mine?.length) return [];
-  const { data: rs } = await supa.from('lesson_comments').select('*').in('parent_id', mine.map(x => x.id)).neq('user_id', S.user.id).is('deleted_at', null).order('created_at');
-  const seen = seenReplies();
-  return (rs || []).filter(r => !seen.has(r.id));
-}
-async function refreshReplyCount(){
-  const rs = await fetchUnseenReplies();
-  L.replyCount = rs.length;
-  refreshQueueBadge();
-  return L.replyCount;
-}
-/* ⭕️を押したとき：一番古い未読の返信の場所を開く */
-async function openNextReply(){
-  const rs = await fetchUnseenReplies();
-  if (!rs.length) { L.replyCount = 0; refreshQueueBadge(); return false; }
-  const r = rs[0];
-  const { data } = await supa.from('lessons').select('*').eq('id', r.lesson_id).single();
-  if (!data) return false;
-  L.cohort = L.cohorts.find(c => c.id === data.cohort_id);
-  await openLesson(data, { scrollTo: r.parent_id });
-  return true;
-}
 
 /* ---------- ホームの2行目（index.html の openHome から） ----------
    入っている場所を見て、今日動いているものが1つあればそれ。なければ直近の予定。どちらもなければ ''。 */
@@ -103,12 +71,12 @@ async function lessonsHomeStatus(){
       .not('publish_at', 'is', null).lte('publish_at', new Date().toISOString())
       .order('day_no', { ascending:false }).limit(1);
     const l = data?.[0];
-    if (l) return { text:`${c.name} は今日 Day ${l.day_no} です。`, go:() => openLessonById(l.id, c) };
+    if (l) return { text:`${c.name} は今日 Day ${l.day_no} です。`, go:() => openCohortChat(c) };
   }
   const upcoming = L.myCM.map(m => L.cohorts.find(c => c.id === m.cohort_id))
     .filter(c => c && c.starts_on && new Date(c.starts_on) > new Date())
     .sort((a,b) => a.starts_on.localeCompare(b.starts_on))[0];
-  if (upcoming) return { text:`${upcoming.name} は ${fmtDateJ(upcoming.starts_on)} の朝から始まります。`, go:() => openLessonsRoom(cohortRoom(upcoming)) };
+  if (upcoming) return { text:`${upcoming.name} は ${fmtDateJ(upcoming.starts_on)} の朝から始まります。`, go:() => openCohortChat(upcoming) };
   return null;
 }
 
@@ -231,22 +199,12 @@ async function openLessonsRoom(room, tab){
     if (canEdit(room.id)) {
       if (L.queueCount && await openNextUnanswered()) return;
     } else {
-      if (L.replyCount && await openNextReply()) return;
-      const l = await latestLessonFor(room);
-      if (l) return openLessonById(l.id);
+      const mine = L.cohorts.filter(c => c.room_id === room.id && myCMFor(c.id) && c.status !== 'past');
+      if (mine.length === 1) return openCohortChat(mine[0]);
     }
   }
   L.queueMode = false;
   openLessonsList(room, tab);
-}
-/* 参加中の期のうち、公開済みの回がある期がちょうど1つなら、その最新の回 */
-async function latestLessonFor(room){
-  const mine = L.cohorts.filter(c => c.room_id === room.id && myCMFor(c.id) && c.status !== 'past');
-  if (mine.length !== 1) return null;
-  const { data } = await supa.from('lessons').select('id, day_no, publish_at').eq('cohort_id', mine[0].id)
-    .not('publish_at', 'is', null).lte('publish_at', new Date().toISOString())
-    .order('day_no', { ascending:false }).limit(1);
-  return data?.[0] || null;
 }
 function openLessonsList(room, tab){
   leaveChat();
@@ -317,7 +275,7 @@ async function renderSeries(){
   $('page').querySelectorAll('[data-tag]').forEach(el => el.onclick = () => { L.tagFilter = el.dataset.tag === 'すべて' ? null : el.dataset.tag; renderSeries(); });
   $('page').querySelectorAll('[data-cohort]').forEach(el => el.onclick = e => {
     if (e.target.closest('button')) return;
-    openCohortDays(L.cohorts.find(c => c.id === el.dataset.cohort));
+    openCohortChat(L.cohorts.find(c => c.id === el.dataset.cohort));
   });
   $('page').querySelectorAll('[data-cedit]').forEach(el => el.onclick = e => {
     e.stopPropagation(); openCohortModal(L.cohorts.find(c => c.id === el.dataset.cedit), room);
@@ -351,8 +309,9 @@ async function openCohortDays(c){
   L.cohort = c;
   S.current = { type:'cohort', room, cohort: c };
   $('room-title').textContent = c.name;
-  $('tabs').innerHTML = `<div class="tab" data-tab="back">‹ ${esc(room?.name || 'シリーズ')}</div>`;
+  $('tabs').innerHTML = `<div class="tab" data-tab="back">‹ ${esc(room?.name || 'シリーズ')}</div><div class="tab" data-tab="chat">チャット</div><div class="tab active" data-tab="days">レッスン一覧</div>`;
   $('tabs').querySelector('[data-tab="back"]').onclick = () => openLessonsList(room, 'series');
+  $('tabs').querySelector('[data-tab="chat"]').onclick = () => openCohortChat(c);
   updatePinBtn(); highlightNav();
   $('page').innerHTML = `<div class="empty">読み込み中…</div>`;
   const editor = canEditCohort(c);
@@ -446,8 +405,8 @@ async function openLesson(l, opts = {}){
   leaveChat();
   S.current = { type:'lesson', room, cohort: c, lesson: l };
   $('room-title').textContent = c?.name || '';
-  $('tabs').innerHTML = `<div class="tab" data-tab="back">‹ Day 一覧</div>`;
-  $('tabs').querySelector('[data-tab="back"]').onclick = () => openCohortDays(c);
+  $('tabs').innerHTML = `<div class="tab" data-tab="back">‹ チャット</div>`;
+  $('tabs').querySelector('[data-tab="back"]').onclick = () => openCohortChat(c);
   updatePinBtn(); highlightNav();
   $('page').innerHTML = `<div class="empty">読み込み中…</div>`;
   const editor = canEditCohort(c);
@@ -480,12 +439,6 @@ async function openLesson(l, opts = {}){
   const pinned = !!L.pins['lesson:' + l.id];
   const top = comments.filter(x => !x.parent_id);
   const replies = id => comments.filter(x => x.parent_id === id);
-  // 自分のコメントに付いた返信は、この画面を開いた時点で「見た」ことにする
-  if (!editor) {
-    const myTop = new Set(top.filter(x => x.user_id === S.user.id).map(x => x.id));
-    const got = comments.filter(x => x.parent_id && myTop.has(x.parent_id) && x.user_id !== S.user.id).map(x => x.id);
-    if (got.length) { markRepliesSeen(got); refreshReplyCount(); }
-  }
   // 前後の Day（参加者は公開済みだけ）
   const nowT = Date.now();
   const seq = L.lessons.filter(x => x.cohort_id === l.cohort_id && (editor || (x.publish_at && new Date(x.publish_at).getTime() <= nowT)));
@@ -680,8 +633,7 @@ async function openPinsPage(){
   $('page').querySelectorAll('[data-pcomment]').forEach(el => el.onclick = async () => {
     const { data } = await supa.from('lessons').select('*').eq('id', el.dataset.plesson2).single();
     if (!data) return toast('この回はいま読めません');
-    L.cohort = L.cohorts.find(c => c.id === data.cohort_id);
-    openLesson(data, { scrollTo: el.dataset.pcomment });
+    openCohortChat(L.cohorts.find(c => c.id === data.cohort_id), { scrollTo: el.dataset.pcomment });
   });
 }
 
@@ -716,8 +668,7 @@ async function openNextUnanswered(afterLessonId){
   const { data } = await supa.from('lessons').select('*').eq('id', item.lesson.id).single();
   if (!data) return false;
   L.queueMode = true;
-  L.cohort = L.cohorts.find(c => c.id === data.cohort_id);
-  await openLesson(data, { replyTo: item.c.id });
+  await openCohortChat(L.cohorts.find(c => c.id === data.cohort_id), { replyTo: item.c.id });
   return true;
 }
 async function openQueuePage(){
@@ -742,9 +693,8 @@ async function openQueuePage(){
   $('page').querySelectorAll('[data-q]').forEach(el => el.onclick = async () => {
     const { data } = await supa.from('lessons').select('*').eq('id', el.dataset.ql).single();
     if (!data) return;
-    L.cohort = L.cohorts.find(c => c.id === data.cohort_id);
     L.queueMode = true;
-    openLesson(data, { replyTo: el.dataset.q });
+    openCohortChat(L.cohorts.find(c => c.id === data.cohort_id), { replyTo: el.dataset.q });
   });
 }
 /* 未返信の件数は、サイドバーの 21 Lessons の行に出す（editor 以上にだけ見えます） */
@@ -1069,4 +1019,204 @@ async function renderCohortMembersAdmin(){
     if (error) return toast('削除に失敗しました：' + error.message);
     renderCohortMembersAdmin();
   });
+}
+
+/* ============================================================
+   期のチャット（2026-08-27）
+   期を開いたら、レッスンもコメントも一本の時系列で並ぶ。開いた瞬間は一番下（最新）。
+   レッスンは「題名＋最初の数行」だけ出して、押すと本文の画面へ。
+   PC は右に Day 一覧（ライブラリ）を並べる。スマホはタブで切り替え。
+   ============================================================ */
+const CHAT_EXCERPT = 140;
+const plainText = t => (t || '').replace(/!\[[^\]]*\]\([^)]*\)/g, '').replace(/https?:\/\/\S+\.(png|jpe?g|gif|webp|mp4|mov)\S*/gi, '').replace(/\*\*/g, '').replace(/\s+/g, ' ').trim();
+
+/* 「最後に見た」時刻。cohort_members.last_seen_at があればそこへ、なければ端末に持つ */
+const seenKey = cid => 'cr_seen_' + S.user.id + '_' + cid;
+const lastSeenOf = cid => myCMFor(cid)?.last_seen_at || localStorage.getItem(seenKey(cid)) || '1970-01-01T00:00:00Z';
+async function markCohortSeen(cid){
+  const now = new Date().toISOString();
+  localStorage.setItem(seenKey(cid), now);
+  const cm = myCMFor(cid); if (cm) cm.last_seen_at = now;
+  if (cm) { const { error } = await supa.from('cohort_members').update({ last_seen_at: now }).eq('id', cm.id); if (error) { /* 列がまだ無ければ端末保存だけ */ } }
+}
+/* 参加者の⭕️：参加中の期に、最後に見た時刻より新しいレッスンかコメントがいくつあるか */
+async function fetchNewActivityCount(){
+  const mine = L.cohorts.filter(c => myCMFor(c.id) && c.status !== 'past');
+  if (!mine.length) return 0;
+  const nowIso = new Date().toISOString();
+  const { data: ls } = await supa.from('lessons').select('id, cohort_id, publish_at').in('cohort_id', mine.map(c => c.id)).not('publish_at', 'is', null).lte('publish_at', nowIso);
+  const lessons = ls || [];
+  let n = 0;
+  const lidToC = {}; lessons.forEach(l => lidToC[l.id] = l.cohort_id);
+  lessons.forEach(l => { if (l.publish_at > lastSeenOf(l.cohort_id)) n++; });
+  if (lessons.length) {
+    const oldest = mine.map(c => lastSeenOf(c.id)).sort()[0];
+    const { data: cs } = await supa.from('lesson_comments').select('id, lesson_id, created_at, user_id').in('lesson_id', lessons.map(l => l.id)).is('deleted_at', null).gt('created_at', oldest);
+    (cs || []).forEach(x => { if (x.user_id !== S.user.id && x.created_at > lastSeenOf(lidToC[x.lesson_id])) n++; });
+  }
+  return n;
+}
+async function refreshActivityCount(){
+  L.replyCount = await fetchNewActivityCount();
+  refreshQueueBadge();
+  return L.replyCount;
+}
+
+async function openCohortChat(c, opts = {}){
+  if (!c) return;
+  const room = cohortRoom(c);
+  leaveChat();
+  L.cohort = c;
+  S.current = { type:'cohort', room, cohort: c, view:'chat' };
+  $('room-title').textContent = c.name;
+  const editor = canEditCohort(c);
+  $('tabs').innerHTML = `<div class="tab" data-tab="back">‹ ${esc(room?.name || '21 Lessons')}</div><div class="tab active" data-tab="chat">チャット</div><div class="tab" data-tab="days">レッスン一覧</div>${editor && L.queueCount ? `<div class="tab" data-tab="queue">未返信 ${L.queueCount} →</div>` : ''}`;
+  $('tabs').querySelector('[data-tab="back"]').onclick = () => openLessonsList(room, 'series');
+  $('tabs').querySelector('[data-tab="days"]').onclick = () => openCohortDays(c);
+  const qt = $('tabs').querySelector('[data-tab="queue"]'); if (qt) qt.onclick = () => openNextUnanswered();
+  updatePinBtn(); highlightNav();
+  $('page').innerHTML = `<div class="empty">読み込み中…</div>`;
+  try { await loadCohortLessons(c); } catch (e) { $('page').innerHTML = errBox(e); return; }
+  if (S.current.cohort !== c) return;
+  const now = Date.now();
+  const published = L.lessons.filter(l => l.publish_at && new Date(l.publish_at).getTime() <= now).sort((a,b) => a.publish_at.localeCompare(b.publish_at));
+  const { data: cms } = published.length ? await supa.from('lesson_comments').select('*').in('lesson_id', published.map(l => l.id)).order('created_at') : { data: [] };
+  const comments = (cms || []).filter(x => !x.deleted_at);
+  const editors = await editorIdsFor(c.room_id);
+  await ensureNames(comments.map(x => x.user_id).concat(editors));
+  const byId = {}; comments.forEach(x => byId[x.id] = x);
+  const lastSeen = lastSeenOf(c.id);
+  const cm = myCMFor(c.id);
+
+  const items = [
+    ...published.map(l => ({ t: l.publish_at, kind:'lesson', l })),
+    ...comments.map(x => ({ t: x.created_at, kind:'comment', x })),
+  ].sort((a,b) => a.t.localeCompare(b.t));
+
+  let firstNew = null;
+  const html = items.map(it => {
+    const isNew = it.t > lastSeen && !(it.kind === 'comment' && it.x.user_id === S.user.id);
+    const newMark = isNew && !firstNew ? (firstNew = it, `<div class="day-divider" id="first-new"><span style="color:var(--ai)">ここから新しい</span></div>`) : '';
+    if (it.kind === 'lesson') {
+      const l = it.l, ex = plainText(l.body);
+      return newMark + `<div class="msg msg-lesson" data-open-lesson="${l.id}">
+        <div class="avatar" style="background:var(--ai)">${l.day_no}</div>
+        <div class="msg-body">
+          <div class="msg-head"><b>Day ${l.day_no}${l.title ? `　${esc(l.title)}` : ''}</b><span>${fmtWhen(l.publish_at)}</span></div>
+          <div class="lesson-bubble">${l.image_path ? `<div class="lb-img" data-img="${esc(l.image_path)}"></div>` : ''}<div class="lb-text">${esc(ex.slice(0, CHAT_EXCERPT))}${ex.length > CHAT_EXCERPT ? '…' : ''}</div><div class="lb-more">全文を読む →</div></div>
+        </div></div>`;
+    }
+    const x = it.x, mine = x.user_id === S.user.id, isEd = editors.includes(x.user_id);
+    const parent = x.parent_id ? byId[x.parent_id] : null;
+    return newMark + `<div class="msg ${mine ? 'mine' : ''}" id="c-${x.id}">
+      <div class="avatar cav ${isEd ? 'cav-ed' : ''}">${esc(initialOf(S.profilesCache[x.user_id]))}</div>
+      <div class="msg-body">
+        <div class="msg-head"><b>${esc(S.profilesCache[x.user_id] || '…')}</b>${isEd ? '<span class="cwho-ed" style="margin-left:6px">担当</span>' : ''}<span>${fmtWhen(x.created_at)}</span></div>
+        ${parent ? `<div class="msg-quote">↩ ${esc(S.profilesCache[parent.user_id] || '')}：${esc(plainText(parent.body).slice(0, 50))}</div>` : ''}
+        <div class="msg-text">${esc(x.body)}</div>
+        <div class="msg-tools"><button data-reply="${x.parent_id || x.id}" data-reply-name="${esc(S.profilesCache[x.user_id] || '')}">↩ 返信</button>${(mine || editor) ? `<button data-del="${x.id}">削除</button>` : ''}</div>
+      </div></div>`;
+  }).join('');
+
+  const latest = published[published.length - 1];
+  const canPost = !!latest;
+  const startNote = !published.length ? (c.starts_on && new Date(c.starts_on) > new Date() ? `${fmtDateJ(c.starts_on)} の朝、最初のレッスンがここに届きます。` : 'まだレッスンはありません。') : '';
+  const unpaid = cm && !cm.paid_at && !editor;
+  $('page').innerHTML = `<div class="chat-cols">
+    <div class="chat-wrap" id="chat-wrap">
+      <div class="chat-scroll" id="chat-scroll">
+        ${c.intro && !published.length ? `<div class="ch-intro" style="font-size:14.5px">${richText(c.intro)}</div>` : ''}
+        ${startNote ? `<div class="day-divider"><span>${esc(startNote)}</span></div>` : ''}
+        ${unpaid ? `<div class="day-divider"><span style="color:var(--ai)">お支払いの確認待ち（案内は「レッスン一覧」に）</span></div>` : ''}
+        ${html}
+      </div>
+      <div class="reply-chip" id="reply-chip" style="display:none"></div>
+      <div class="chat-input"><textarea id="chat-in" rows="1" placeholder="${canPost ? (editor ? 'ひとこと・返信を書く…' : '質問やコメントを書く…') : 'レッスンが届いたら書けます'}" ${canPost ? '' : 'disabled'}></textarea><button class="send" id="chat-send" ${canPost ? '' : 'disabled'}>↑</button></div>
+    </div>
+    <div class="lib-col" id="lib-col"></div>
+  </div>`;
+  drawDaysInto($('lib-col'), true);
+
+  // 画像のサムネ（署名URL）
+  $('page').querySelectorAll('[data-img]').forEach(async el => { const u = await lessonImageUrl(el.dataset.img); if (u) el.style.backgroundImage = `url("${u}")`; else el.remove(); });
+  $('page').querySelectorAll('[data-open-lesson]').forEach(el => el.onclick = () => openLesson(L.lessons.find(l => l.id === el.dataset.openLesson)));
+
+  // 返信先
+  let replyTo = null;
+  const chip = $('reply-chip');
+  const setReply = (id, name) => {
+    replyTo = id;
+    if (!id) { chip.style.display = 'none'; chip.innerHTML = ''; return; }
+    chip.style.display = 'flex'; chip.innerHTML = `<span>↩ ${esc(name)}さんに返信</span><button id="reply-x">×</button>`;
+    $('reply-x').onclick = () => setReply(null);
+    $('chat-in').focus();
+  };
+  $('page').querySelectorAll('[data-reply]').forEach(el => el.onclick = () => setReply(el.dataset.reply, el.dataset.replyName));
+  $('page').querySelectorAll('[data-del]').forEach(el => el.onclick = async () => {
+    if (!confirm('このコメントを削除しますか？')) return;
+    const { error } = await supa.from('lesson_comments').update({ deleted_at: new Date().toISOString() }).eq('id', el.dataset.del);
+    if (error) return toast('削除に失敗しました：' + error.message);
+    openCohortChat(c, { keepScroll: true });
+  });
+
+  const ta = $('chat-in'), grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(120, ta.scrollHeight) + 'px'; };
+  ta.oninput = grow;
+  const post = async () => {
+    const body = ta.value.trim(); if (!body) return;
+    const lessonId = replyTo ? byId[replyTo]?.lesson_id || latest.id : latest.id;
+    const { error } = await supa.from('lesson_comments').insert({ lesson_id: lessonId, user_id: S.user.id, parent_id: replyTo || null, body });
+    if (error) return toast('送信に失敗しました：' + error.message);
+    ta.value = '';
+    const wasReply = replyTo; setReply(null);
+    if (editor && wasReply && L.queueMode) {
+      const n = await refreshQueueCount();
+      if (n && await openNextUnanswered(lessonId)) { toast(`返信しました。次の未返信へ（残り ${n}）`); return; }
+      L.queueMode = false; toast('返信しました。未返信はもうありません');
+    } else if (editor) refreshQueueCount();
+    openCohortChat(c, { keepScroll: true });
+  };
+  $('chat-send').onclick = post;
+  ta.onkeydown = e => enterToSend(e, post);
+
+  // スクロール位置：指定があればそこへ、なければ一番下
+  const sc = $('chat-scroll');
+  if (opts.scrollTo && $('c-' + opts.scrollTo)) { $('c-' + opts.scrollTo).scrollIntoView({ block:'center' }); }
+  else if (!opts.keepScroll && !opts.replyTo && $('first-new')) { $('first-new').scrollIntoView({ block:'start' }); }
+  else sc.scrollTop = sc.scrollHeight;
+  if (opts.replyTo && byId[opts.replyTo]) { const p = byId[opts.replyTo]; setReply(p.parent_id || p.id, S.profilesCache[p.user_id] || ''); const el = $('c-' + opts.replyTo); if (el) el.scrollIntoView({ block:'center' }); }
+  document.querySelector('.content').scrollTop = 0;
+
+  // 見た、にする（自分の⭕️を消す）
+  if (!editor) { markCohortSeen(c.id).then(() => refreshActivityCount()); }
+
+  // 新しいコメントが入ったら描き直す（自分の画面を開いている間）
+  S.chatChannel = supa.channel('cohort-' + c.id).on('postgres_changes', { event:'INSERT', schema:'public', table:'lesson_comments' }, payload => {
+    if (S.current?.cohort !== c || S.current?.view !== 'chat') return;
+    if (!published.some(l => l.id === payload.new?.lesson_id)) return;
+    if (payload.new?.user_id === S.user.id) return;
+    openCohortChat(c, { keepScroll: true });
+  }).subscribe();
+}
+
+/* Day 一覧を指定の場所に描く（チャットの右カラム用。compact なら見出しを小さく） */
+function drawDaysInto(container, compact){
+  const c = L.cohort, editor = canEditCohort(c);
+  const now = Date.now();
+  const total = c.total_sessions || 21;
+  const published = L.lessons.filter(l => l.publish_at && new Date(l.publish_at).getTime() <= now);
+  const shown = editor ? L.lessons : published;
+  const rows = shown.slice().sort((a,b) => b.day_no - a.day_no).map(l => {
+    const isPub = l.publish_at && new Date(l.publish_at).getTime() <= now;
+    const state = !l.publish_at ? '<span class="pill-g">下書き</span>' : !isPub ? `<span class="pill-g">${fmtWhen(l.publish_at)} に出ます</span>` : (editor ? '' : L.reads[l.id] ? '' : '<span class="pill-open">未読</span>');
+    return `<div class="lrow" data-lib-lesson="${l.id}" style="padding:9px 0">
+      <div class="lico ${isPub ? '' : 'plain'}" style="width:32px;height:32px;font-size:13px">${l.day_no}</div>
+      <div class="lmain"><div class="lt1" style="font-size:13.5px">${esc(l.title || `Day ${l.day_no}`)}</div></div>
+      <div class="lright">${L.pins['lesson:' + l.id] ? '<span style="color:var(--ai)">★</span> ' : ''}${state}</div></div>`;
+  }).join('');
+  container.innerHTML = `<div class="card" style="padding:16px 18px">
+    <h3 style="font-size:14px"><span class="bar"></span>レッスン一覧<span class="muted" style="margin-left:auto;font-weight:400">${published.length}／${total}</span></h3>
+    ${published.length ? `<div class="prog"><i style="width:${Math.round(published.length / total * 100)}%"></i></div>` : ''}
+    ${rows || `<div class="empty" style="padding:12px 0">${c.starts_on && new Date(c.starts_on) > new Date() ? `${fmtDateJ(c.starts_on)} の朝から` : 'まだありません'}</div>`}
+  </div>`;
+  container.querySelectorAll('[data-lib-lesson]').forEach(el => el.onclick = () => openLesson(L.lessons.find(l => l.id === el.dataset.libLesson)));
 }
