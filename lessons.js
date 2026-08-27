@@ -147,11 +147,13 @@ async function openRoomAbout(room){
           : `<button class="primary-btn" style="margin-top:10px" data-cohort-join="${c.id}">${c.payment_url ? '申し込む' : '参加する'}</button>`}
       </div>`).join('');
   } else {
-    h += `<div class="card">
-      <div class="nocta">${esc(room.next_intake || 'いまは募集していません')}</div>
-      <button class="ghost-btn" id="about-notify">募集が始まったら知らせる</button>
-    </div>`;
-  }
+  h += `<div class="card">
+    <div class="nocta">${room.next_intake ? richText(room.next_intake) : 'いまは募集していません'}</div>
+    ${room.cta_url
+      ? `<a class="primary-btn" href="${esc(room.cta_url)}" target="_blank" rel="noopener">${esc(room.cta_label || '申し込む')}</a>`
+      : `<button class="ghost-btn" id="about-notify">募集が始まったら知らせる</button>`}
+  </div>`;
+}
   $('page').innerHTML = h;
   const j = $('about-join'); if (j) j.onclick = () => joinPublicRoom(room.id);
   $('page').querySelectorAll('[data-cohort-join]').forEach(el => el.onclick = () => joinCohort(el.dataset.cohortJoin, room));
