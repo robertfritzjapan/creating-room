@@ -309,9 +309,7 @@ async function openCohortDays(c){
   L.cohort = c;
   S.current = { type:'cohort', room, cohort: c };
   $('room-title').textContent = c.name;
-  $('tabs').innerHTML = `<div class="tab" data-tab="back">‹ ${esc(room?.name || 'シリーズ')}</div><div class="tab" data-tab="chat">チャット</div><div class="tab active" data-tab="days">レッスン一覧</div>`;
-  $('tabs').querySelector('[data-tab="back"]').onclick = () => openLessonsList(room, 'series');
-  $('tabs').querySelector('[data-tab="chat"]').onclick = () => openCohortChat(c);
+  cohortTabs(c, 'days');
   updatePinBtn(); highlightNav();
   $('page').innerHTML = `<div class="empty">読み込み中…</div>`;
   const editor = canEditCohort(c);
@@ -366,8 +364,6 @@ function drawDays(){
     ${editor ? `<div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="add-res-btn" style="margin-bottom:0" id="c-edit">✏️ この期を編集</button>
     </div>` : ''}
-    ${c.intro ? `<div class="card"><h3><span class="bar"></span>${esc(c.name)}</h3>
-      <div class="ch-intro" style="margin-bottom:0">${richText(c.intro)}</div></div>` : ''}
     ${(editor || (myCMFor(c.id) && !myCMFor(c.id).paid_at)) && (c.price_jpy != null || c.payment_info || c.payment_url) ? `<div class="card" style="background:#faf9f8">
       <h3><span class="bar"></span>${editor ? '参加者に見えるお支払いの案内' : 'お支払いのご案内'}<span class="muted" style="margin-left:auto;font-weight:400">${editor ? '入金確認がつくまで表示されます' : 'お支払いの確認待ち'}</span></h3>
       ${c.price_jpy != null ? `<div class="kv"><b>参加費</b>¥${Number(c.price_jpy).toLocaleString('ja-JP')}</div>` : ''}
@@ -378,7 +374,9 @@ function drawDays(){
       <h3><span class="bar"></span>${total}日のレッスン<span class="muted" style="margin-left:auto;font-weight:400">${published.length}／${total} 公開${!editor && published.length ? `　読了 ${readCount}` : ''}</span></h3>
       ${published.length ? `<div class="prog"><i style="width:${Math.round(published.length / total * 100)}%"></i></div>` : ''}
       ${rows}${empty}
-    </div>`;
+    </div>
+    ${c.intro ? `<details class="card intro-details" ${published.length ? '' : 'open'}><summary><span class="bar"></span>${esc(c.name)} について</summary>
+      <div class="ch-intro" style="margin:12px 0 0">${richText(c.intro)}</div></details>` : ''}`;
   $('page').querySelectorAll('[data-lesson]').forEach(el => el.onclick = e => {
     if (e.target.closest('button')) return;
     openLesson(L.lessons.find(l => l.id === el.dataset.lesson));
@@ -405,8 +403,7 @@ async function openLesson(l, opts = {}){
   leaveChat();
   S.current = { type:'lesson', room, cohort: c, lesson: l };
   $('room-title').textContent = c?.name || '';
-  $('tabs').innerHTML = `<div class="tab" data-tab="back">‹ チャット</div>`;
-  $('tabs').querySelector('[data-tab="back"]').onclick = () => openCohortChat(c);
+  cohortTabs(c, 'days', `Day ${l.day_no}`);
   updatePinBtn(); highlightNav();
   $('page').innerHTML = `<div class="empty">読み込み中…</div>`;
   const editor = canEditCohort(c);
@@ -481,7 +478,7 @@ async function openLesson(l, opts = {}){
   $('page').innerHTML = `
     <div class="card lesson-card">
       ${img ? `<img class="lesson-img" src="${img}" alt="">` : ''}
-      <div class="ltitle">Day ${l.day_no}${l.title ? `　${esc(l.title)}` : ''}</div>
+      <div class="ltitle">${l.title && /^day\s*\d/i.test(l.title) ? esc(l.title) : `Day ${l.day_no}${l.title ? `　${esc(l.title)}` : ''}`}</div>
       <div class="lmeta">${esc(c?.name || '')} ・ ${l.publish_at ? fmtWhen(l.publish_at) + ' 公開' : '下書き'}${editor ? `　<a href="#" id="l-edit">編集する</a>` : ''}</div>
       <div class="ltext">${richText(l.body || '')}</div>
       <div class="acts">
@@ -503,10 +500,8 @@ async function openLesson(l, opts = {}){
       </div>
     </div>`;
 
-  // タブの位置に「コメントへ ↓」「未返信 →」を置く（本文が長くても、コメントにすぐ行ける）
-  $('tabs').insertAdjacentHTML('beforeend', `<div class="tab" data-tab="comments">コメント ${top.length}件 ↓</div>${editor && L.queueCount ? `<div class="tab" data-tab="queue">未返信 ${L.queueCount} →</div>` : ''}`);
-  $('tabs').querySelector('[data-tab="comments"]').onclick = () => $('comments').scrollIntoView({ block:'start', behavior:'smooth' });
-  const qt = $('tabs').querySelector('[data-tab="queue"]'); if (qt) qt.onclick = () => openNextUnanswered();
+  // 題名の下に「コメント ↓」（本文が長くても、コメントにすぐ行ける）
+  const ttl = $('page').querySelector('.ltitle'); if (ttl) { ttl.insertAdjacentHTML('afterend', `<div style="margin:-6px 0 12px"><button class="act" id="to-comments" style="font-size:12px">コメント ${top.length}件 ↓</button></div>`); $('to-comments').onclick = () => $('comments').scrollIntoView({ block:'start', behavior:'smooth' }); }
   $('page').querySelectorAll('[data-goday]').forEach(el => el.onclick = () => openLesson(L.lessons.find(x => x.id === el.dataset.goday)));
 
   const cin = $('cin');
@@ -1062,18 +1057,27 @@ async function refreshActivityCount(){
   return L.replyCount;
 }
 
+/* 期の中では上のバーを固定する：‹ 部屋 ｜ チャット ｜ レッスン一覧（＋editor の未返信） */
+function cohortTabs(c, active, sub){
+  const room = cohortRoom(c), editor = canEditCohort(c);
+  $('room-title').textContent = c.name + (sub ? ' › ' + sub : '');
+  $('tabs').innerHTML = `<div class="tab" data-tab="back">‹ ${esc(room?.name || '21 Lessons')}</div>
+    <div class="tab ${active === 'chat' ? 'active' : ''}" data-tab="chat">チャット</div>
+    <div class="tab ${active === 'days' ? 'active' : ''}" data-tab="days">レッスン一覧</div>
+    ${editor && L.queueCount ? `<div class="tab" data-tab="queue">未返信 ${L.queueCount} →</div>` : ''}`;
+  $('tabs').querySelector('[data-tab="back"]').onclick = () => openLessonsList(room, 'series');
+  $('tabs').querySelector('[data-tab="chat"]').onclick = () => openCohortChat(c);
+  $('tabs').querySelector('[data-tab="days"]').onclick = () => openCohortDays(c);
+  const qt = $('tabs').querySelector('[data-tab="queue"]'); if (qt) qt.onclick = () => openNextUnanswered();
+}
 async function openCohortChat(c, opts = {}){
   if (!c) return;
   const room = cohortRoom(c);
   leaveChat();
   L.cohort = c;
   S.current = { type:'cohort', room, cohort: c, view:'chat' };
-  $('room-title').textContent = c.name;
   const editor = canEditCohort(c);
-  $('tabs').innerHTML = `<div class="tab" data-tab="back">‹ ${esc(room?.name || '21 Lessons')}</div><div class="tab active" data-tab="chat">チャット</div><div class="tab" data-tab="days">レッスン一覧</div>${editor && L.queueCount ? `<div class="tab" data-tab="queue">未返信 ${L.queueCount} →</div>` : ''}`;
-  $('tabs').querySelector('[data-tab="back"]').onclick = () => openLessonsList(room, 'series');
-  $('tabs').querySelector('[data-tab="days"]').onclick = () => openCohortDays(c);
-  const qt = $('tabs').querySelector('[data-tab="queue"]'); if (qt) qt.onclick = () => openNextUnanswered();
+  cohortTabs(c, 'chat');
   updatePinBtn(); highlightNav();
   $('page').innerHTML = `<div class="empty">読み込み中…</div>`;
   try { await loadCohortLessons(c); } catch (e) { $('page').innerHTML = errBox(e); return; }
@@ -1102,7 +1106,7 @@ async function openCohortChat(c, opts = {}){
       return newMark + `<div class="msg msg-lesson" data-open-lesson="${l.id}">
         <div class="avatar" style="background:var(--ai)">${l.day_no}</div>
         <div class="msg-body">
-          <div class="msg-head"><b>Day ${l.day_no}${l.title ? `　${esc(l.title)}` : ''}</b><span>${fmtWhen(l.publish_at)}</span></div>
+          <div class="msg-head"><b>${l.title && /^day\s*\d/i.test(l.title) ? esc(l.title) : `Day ${l.day_no}${l.title ? `　${esc(l.title)}` : ''}`}</b><span>${fmtWhen(l.publish_at)}</span></div>
           <div class="lesson-bubble">${l.image_path ? `<div class="lb-img" data-img="${esc(l.image_path)}"></div>` : ''}<div class="lb-text">${esc(ex.slice(0, CHAT_EXCERPT))}${ex.length > CHAT_EXCERPT ? '…' : ''}</div><div class="lb-more">全文を読む →</div></div>
         </div></div>`;
     }
