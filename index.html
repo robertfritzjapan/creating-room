@@ -1610,8 +1610,9 @@ $('ch-img-file').onchange = async () => {
   if (error) { $('ch-img-status').textContent = ''; return toast('画像のアップロードに失敗しました：' + error.message); }
   const { data } = supa.storage.from('room-media').getPublicUrl(path);
   const ta = $('ch-intro');
-  ta.value = (ta.value ? ta.value.replace(/\n*$/, '\n\n') : '') + data.publicUrl + '\n';
-  $('ch-img-status').textContent = '✓ 挿入しました';
+  // 期の紹介は、画像を先頭に置く（募集カードで最初に目に入るように）
+  ta.value = data.publicUrl + '\n\n' + ta.value.replace(/^\n*/, '');
+  $('ch-img-status').textContent = '✓ いちばん上に入れました';
   $('ch-img-file').value = '';
 };
 

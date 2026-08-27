@@ -294,13 +294,16 @@ async function openCohortDays(c){
   const editor = canEditCohort(c);
   const cm = myCMFor(c.id);
   if (!editor && !cm?.paid_at) {
-    $('page').innerHTML = `<div class="card"><h3><span class="bar"></span>${esc(c.name)}</h3>
-      ${c.intro ? `<div class="ch-intro">${richText(c.intro)}</div>` : ''}
-      <p style="font-size:13px">お支払いの確認ができると、ここに毎朝のレッスンが並びます。</p>
-      ${c.price_jpy != null ? `<div class="kv" style="margin-top:10px"><b>参加費</b>¥${Number(c.price_jpy).toLocaleString('ja-JP')}</div>` : ''}
-      ${c.payment_info ? `<div class="kv stack"><b>お支払い</b><span>${richText(c.payment_info)}</span></div>` : ''}
-      ${c.payment_url ? `<a class="zoom-btn" href="${esc(c.payment_url)}" target="_blank" rel="noopener">${payLabel(c.payment_url)}</a>` : ''}
-    </div>`;
+    $('page').innerHTML = `
+      <div class="card"><h3><span class="bar"></span>${esc(c.name)}</h3>
+        ${c.intro ? `<div class="ch-intro">${richText(c.intro)}</div>` : ''}
+      </div>
+      <div class="card"><h3><span class="bar"></span>お申し込み</h3>
+        <p class="sub" style="margin-bottom:14px">お支払いの確認ができると、ここに毎朝のレッスンが並びます。</p>
+        ${c.price_jpy != null ? `<div class="kv"><b>参加費</b>¥${Number(c.price_jpy).toLocaleString('ja-JP')}</div>` : ''}
+        ${c.payment_info ? `<div class="kv stack"><b>お支払い</b><span>${richText(c.payment_info)}</span></div>` : ''}
+        ${c.payment_url ? `<a class="zoom-btn" href="${esc(c.payment_url)}" target="_blank" rel="noopener">${payLabel(c.payment_url)}</a>` : ''}
+      </div>`;
     return;
   }
   try { await loadCohortLessons(c); } catch (e) { $('page').innerHTML = errBox(e); return; }
@@ -341,7 +344,7 @@ function drawDays(){
       <button class="add-res-btn" style="margin-bottom:0" id="c-edit">✏️ この期を編集</button>
     </div>` : ''}
     ${c.intro ? `<div class="card"><h3><span class="bar"></span>${esc(c.name)}</h3>
-      <div class="ch-intro">${richText(c.intro)}</div></div>` : ''}
+      <div class="ch-intro" style="margin-bottom:0">${richText(c.intro)}</div></div>` : ''}
     ${editor && (c.price_jpy != null || c.payment_info || c.payment_url) ? `<div class="card" style="background:#faf9f8">
       <h3><span class="bar"></span>参加者に見えるお支払いの案内<span class="muted" style="margin-left:auto;font-weight:400">入金確認がつくまで表示されます</span></h3>
       ${c.price_jpy != null ? `<div class="kv"><b>参加費</b>¥${Number(c.price_jpy).toLocaleString('ja-JP')}</div>` : ''}
