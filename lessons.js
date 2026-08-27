@@ -132,6 +132,7 @@ async function openRoomAbout(room){
     h += openC.map(c => `
       <div class="card">
         <h3><span class="bar"></span>${esc(c.name)}${c.period_label ? `<span class="muted" style="margin-left:8px;font-weight:400">${esc(c.period_label)}</span>` : ''}<span class="pill-open" style="margin-left:auto">募集中</span></h3>
+        ${c.intro ? `<div class="ch-intro">${richText(c.intro)}</div>` : ''}
         ${c.starts_on ? `<div class="kv"><b>開始</b>${fmtDateJ(c.starts_on)}${c.total_sessions ? `（${c.total_sessions}日）` : ''}</div>` : ''}
         ${c.intake_to ? `<div class="kv"><b>申込期間</b>${c.intake_from ? fmtDateJ(c.intake_from) + ' 〜 ' : ''}${fmtDateJ(c.intake_to)}</div>` : ''}
         ${c.price_jpy != null ? `<div class="kv"><b>参加費</b>¥${Number(c.price_jpy).toLocaleString('ja-JP')}</div>` : ''}
@@ -294,6 +295,7 @@ async function openCohortDays(c){
   const cm = myCMFor(c.id);
   if (!editor && !cm?.paid_at) {
     $('page').innerHTML = `<div class="card"><h3><span class="bar"></span>${esc(c.name)}</h3>
+      ${c.intro ? `<div class="ch-intro">${richText(c.intro)}</div>` : ''}
       <p style="font-size:13px">お支払いの確認ができると、ここに毎朝のレッスンが並びます。</p>
       ${c.price_jpy != null ? `<div class="kv" style="margin-top:10px"><b>参加費</b>¥${Number(c.price_jpy).toLocaleString('ja-JP')}</div>` : ''}
       ${c.payment_info ? `<div class="kv stack"><b>お支払い</b><span>${richText(c.payment_info)}</span></div>` : ''}
@@ -338,6 +340,8 @@ function drawDays(){
     ${editor ? `<div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="add-res-btn" style="margin-bottom:0" id="c-edit">✏️ この期を編集</button>
     </div>` : ''}
+    ${c.intro ? `<div class="card"><h3><span class="bar"></span>${esc(c.name)}</h3>
+      <div class="ch-intro">${richText(c.intro)}</div></div>` : ''}
     ${editor && (c.price_jpy != null || c.payment_info || c.payment_url) ? `<div class="card" style="background:#faf9f8">
       <h3><span class="bar"></span>参加者に見えるお支払いの案内<span class="muted" style="margin-left:auto;font-weight:400">入金確認がつくまで表示されます</span></h3>
       ${c.price_jpy != null ? `<div class="kv"><b>参加費</b>¥${Number(c.price_jpy).toLocaleString('ja-JP')}</div>` : ''}
@@ -834,6 +838,22 @@ function openCohortModal(c, room){
   $('ch-modal-title').textContent = c ? '期を編集' : '期を作る';
   $('ch-name').value = c?.name || '';
   $('ch-period').value = c?.period_label || '';
+  $('ch-intro').value = c?.intro || '';
+  $('ch-img-status').textContent = '';
+  $('ch-img-btn').onclick = () => $('ch-img-file').click();
+  $('ch-img-file').onchange = async () => {
+    const file = $('ch-img-file').files[0];
+    if (!file) return;
+    $('ch-img-status').textContent = 'アップロード中…';
+    const path = `${room.slug}/${Date.now()}-${file.name.replace(/[^\w.\-]+/g, '_')}`;
+    const { error } = await supa.storage.from('room-media').upload(path, file);
+    if (error) { $('ch-img-status').textContent = ''; return toast('画像のアップロードに失敗しました：' + error.message); }
+    const { data } = supa.storage.from('room-media').getPublicUrl(path);
+    const ta = $('ch-intro');
+    ta.value = (ta.value ? ta.value.replace(/\n*$/, '\n\n') : '') + data.publicUrl + '\n';
+    $('ch-img-status').textContent = '✓ 挿入しました';
+    $('ch-img-file').value = '';
+  };
   $('ch-starts').value = c?.starts_on || '';
   $('ch-total').value = c?.total_sessions || 21;
   $('ch-from').value = c?.intake_from || '';
@@ -849,7 +869,8 @@ function openCohortModal(c, room){
   $('ch-save').onclick = async () => {
     const name = $('ch-name').value.trim();
     if (!name) return toast('名前は必須です');
-    const row = { room_id: room.id, name, period_label: $('ch-period').value.trim() || null, starts_on: $('ch-starts').value || null,
+    const row = { room_id: room.id, name, period_label: $('ch-period').value.trim() || null,
+      intro: $('ch-intro').value.trim() || null, starts_on: $('ch-starts').value || null,
       total_sessions: Number($('ch-total').value) || 21, intake_from: $('ch-from').value || null, intake_to: $('ch-to').value || null,
       price_jpy: $('ch-price').value === '' ? null : Number($('ch-price').value), payment_url: $('ch-payurl').value.trim() || null,
       payment_info: $('ch-payinfo').value.trim() || null, status: $('ch-status').value,

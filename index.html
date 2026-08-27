@@ -74,6 +74,8 @@ a{color:var(--ai)}
 .card{background:var(--white);border:1px solid var(--line);border-radius:var(--radius);padding:22px 24px;margin-bottom:18px}
 .card h3{font-family:'Shippori Mincho',serif;font-size:18px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
 .card h3 .bar{width:3px;height:16px;background:var(--ai);border-radius:2px;flex-shrink:0}
+.ch-intro{font-size:16px;line-height:1.9;margin:2px 0 14px}
+.ch-intro img{max-width:100%;border-radius:8px;margin:8px 0}
 .card.cont{margin-top:-18px;border-top:1px solid var(--line);
   border-top-left-radius:0;border-top-right-radius:0}
 .card:has(+ .card.cont){border-bottom:none;border-bottom-left-radius:0;border-bottom-right-radius:0}
@@ -762,6 +764,13 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
     <input class="form-input" id="ch-name" placeholder="例：MMOT 21">
     <label class="form-label">時期のラベル（任意）</label>
     <input class="form-input" id="ch-period" placeholder="例：2026年9月">
+    <label class="form-label">この期の紹介（任意・**はさむ** で太字。画像URLだけの行は画像として出ます）</label>
+    <textarea class="form-input" id="ch-intro" rows="5" placeholder="この期でどんなテーマを扱うのか、誰に向いているのかを書きます。"></textarea>
+    <div style="margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <input type="file" id="ch-img-file" accept="image/*" style="display:none">
+      <button class="add-res-btn" style="margin-bottom:0" id="ch-img-btn">🖼 画像をアップロードして挿入</button>
+      <span class="muted" id="ch-img-status"></span>
+    </div>
     <div style="display:flex;gap:10px">
       <div style="flex:1"><label class="form-label">開始日</label><input class="form-input" id="ch-starts" type="date"></div>
       <div style="width:100px"><label class="form-label">回数</label><input class="form-input" id="ch-total" type="number" value="21"></div>
