@@ -148,7 +148,7 @@ async function openRoomAbout(room){
       </div>`).join('');
   } else {
   h += `<div class="card">
-    <div class="nocta">${room.next_intake ? richText(room.next_intake) : 'いまは募集していません'}</div>
+      <div class="${room.cta_url ? 'about-intake' : 'nocta'}">${room.next_intake ? richText(room.next_intake) : 'いまは募集していません'}</div>
     ${room.cta_url
       ? `<a class="primary-btn" href="${esc(room.cta_url)}" target="_blank" rel="noopener">${esc(room.cta_label || '申し込む')}</a>`
       : `<button class="ghost-btn" id="about-notify">募集が始まったら知らせる</button>`}
