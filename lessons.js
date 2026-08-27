@@ -13,6 +13,8 @@ const L = {
   pins: {},           // 'lesson:'+id / 'comment:'+id -> true
   postDraft: null,    // 入稿画面の状態
   queueCount: 0,
+  replyCount: 0,      // 参加者：自分のコメントに付いた、まだ見ていない返信の数
+  queueMode: false,   // editor：⭕️から入った「未返信を順に返す」モード
 };
 
 const LESSONS_SLUG = 'lessons21';
@@ -20,6 +22,7 @@ const isLessonsRoom = room => !!room && (room.slug === LESSONS_SLUG || room.kind
 const cohortRoom = c => S.rooms.find(r => r.id === c.room_id);
 const myCMFor = cohortId => L.myCM.find(m => m.cohort_id === cohortId);
 const isPaidFor = cohortId => !!myCMFor(cohortId)?.paid_at;
+const isInCohort = cohortId => !!myCMFor(cohortId);   // 申し込んだ時点で読める（入金確認は別）
 const canEditCohort = c => !!c && canEdit(c.room_id);
 const fmtDateJ = iso => iso ? new Date(iso).toLocaleDateString('ja-JP', { timeZone:'Asia/Tokyo', year:'numeric', month:'long', day:'numeric' }) : '';
 const fmtWhen = iso => {
@@ -41,7 +44,7 @@ async function lessonsBootstrap(){
   L.myCM = m.data || [];
   L.editorRooms = S.memberships.filter(x => ['admin','editor'].includes(x.role)).map(x => x.room_id);
   L.postDraft = null;
-  if (editorOfLessons()) refreshQueueCount();
+  if (editorOfLessons()) refreshQueueCount(); else refreshReplyCount();
 }
 const editorOfLessons = () => S.rooms.some(r => isLessonsRoom(r) && canEdit(r.id));
 const editorCohorts = () => L.cohorts.filter(c => canEditCohort(c));
@@ -53,14 +56,47 @@ async function refreshQueueCount(){
   return L.queueCount;
 }
 
+/* ---------- 参加者：自分のコメントに付いた返信（見たものは端末に覚える） ---------- */
+const seenRepliesKey = () => 'cr_seen_replies_' + S.user.id;
+const seenReplies = () => { try { return new Set(JSON.parse(localStorage.getItem(seenRepliesKey()) || '[]')); } catch { return new Set(); } };
+const markRepliesSeen = ids => {
+  if (!ids.length) return;
+  const st = seenReplies(); ids.forEach(id => st.add(id));
+  localStorage.setItem(seenRepliesKey(), JSON.stringify([...st].slice(-500)));
+};
+async function fetchUnseenReplies(){
+  const { data: mine } = await supa.from('lesson_comments').select('id, lesson_id').eq('user_id', S.user.id).is('parent_id', null);
+  if (!mine?.length) return [];
+  const { data: rs } = await supa.from('lesson_comments').select('*').in('parent_id', mine.map(x => x.id)).neq('user_id', S.user.id).is('deleted_at', null).order('created_at');
+  const seen = seenReplies();
+  return (rs || []).filter(r => !seen.has(r.id));
+}
+async function refreshReplyCount(){
+  const rs = await fetchUnseenReplies();
+  L.replyCount = rs.length;
+  refreshQueueBadge();
+  return L.replyCount;
+}
+/* ⭕️を押したとき：一番古い未読の返信の場所を開く */
+async function openNextReply(){
+  const rs = await fetchUnseenReplies();
+  if (!rs.length) { L.replyCount = 0; refreshQueueBadge(); return false; }
+  const r = rs[0];
+  const { data } = await supa.from('lessons').select('*').eq('id', r.lesson_id).single();
+  if (!data) return false;
+  L.cohort = L.cohorts.find(c => c.id === data.cohort_id);
+  await openLesson(data, { scrollTo: r.parent_id });
+  return true;
+}
+
 /* ---------- ホームの2行目（index.html の openHome から） ----------
    入っている場所を見て、今日動いているものが1つあればそれ。なければ直近の予定。どちらもなければ ''。 */
 async function lessonsHomeStatus(){
   if (editorOfLessons()) {
     const n = await refreshQueueCount();
-    if (n) return { text:`未返信のコメントが ${n} 件あります。`, go:() => openQueuePage() };
+    if (n) return { text:`未返信のコメントが ${n} 件あります。`, go:() => openNextUnanswered() };
   }
-  const active = L.myCM.filter(m => m.paid_at).map(m => L.cohorts.find(c => c.id === m.cohort_id))
+  const active = L.myCM.map(m => L.cohorts.find(c => c.id === m.cohort_id))
     .filter(c => c && c.status === 'active');
   for (const c of active) {
     const { data } = await supa.from('lessons').select('id, day_no, publish_at').eq('cohort_id', c.id)
@@ -78,7 +114,7 @@ async function lessonsHomeStatus(){
 
 /* ---------- 新着フィードに混ぜる「今日のレッスン」 ---------- */
 async function lessonsFeedItems(){
-  const ids = L.myCM.filter(m => m.paid_at).map(m => m.cohort_id);
+  const ids = L.myCM.map(m => m.cohort_id);
   const editorIds = editorCohorts().map(c => c.id);
   const all = [...new Set([...ids, ...editorIds])];
   if (!all.length) return [];
@@ -179,20 +215,47 @@ async function joinCohort(cohortId, room){
   L.editorRooms = S.memberships.filter(x => ['admin','editor'].includes(x.role)).map(x => x.room_id);
   renderNav(); renderMe();
   if (c?.payment_url) { window.open(c.payment_url, '_blank', 'noopener'); toast('参加を受け付けました。お支払いページを開きました'); }
-  else toast('参加を受け付けました。お支払いのご案内をご確認ください');
+  else toast('参加を受け付けました。レッスンはもう読めます');
   openRoom(room);
 }
 
 /* ============================================================
    21 Lessons の部屋：シリーズ一覧
    ============================================================ */
-function openLessonsRoom(room, tab){
+/* サイドバーの「21 Lessons」から入ったとき（tab 指定なし）は、一覧を挟まずに行くべき場所へ。
+   editor：未返信があれば、一番古い未返信コメントへ。
+   参加者：未読の返信があればそこへ。なければ、受講中の期がひとつなら最新の Day へ。
+   それ以外（期が複数・まだ始まっていない・期に入っていない）は、これまで通りの一覧。 */
+async function openLessonsRoom(room, tab){
+  if (!tab) {
+    if (canEdit(room.id)) {
+      if (L.queueCount && await openNextUnanswered()) return;
+    } else {
+      if (L.replyCount && await openNextReply()) return;
+      const l = await latestLessonFor(room);
+      if (l) return openLessonById(l.id);
+    }
+  }
+  L.queueMode = false;
+  openLessonsList(room, tab);
+}
+/* 参加中の期のうち、公開済みの回がある期がちょうど1つなら、その最新の回 */
+async function latestLessonFor(room){
+  const mine = L.cohorts.filter(c => c.room_id === room.id && myCMFor(c.id) && c.status !== 'past');
+  if (mine.length !== 1) return null;
+  const { data } = await supa.from('lessons').select('id, day_no, publish_at').eq('cohort_id', mine[0].id)
+    .not('publish_at', 'is', null).lte('publish_at', new Date().toISOString())
+    .order('day_no', { ascending:false }).limit(1);
+  return data?.[0] || null;
+}
+function openLessonsList(room, tab){
   leaveChat();
   S.current = { type:'room', room };
   $('room-title').textContent = room.name;
   updatePinBtn();
   const tabs = [['series','シリーズ'],['pinned','基本情報']];
   if (canEdit(room.id)) tabs.push(['cmembers','参加者・支払い確認']);
+  if (canEdit(room.id) && L.queueCount) tabs.push(['queue',`未返信（${L.queueCount}）`]);
   if (roleIn(room.id) === 'admin') tabs.push(['members','権限']);
   $('tabs').innerHTML = tabs.map(([k,label]) => `<div class="tab" data-tab="${k}">${t(label)}</div>`).join('');
   $('tabs').querySelectorAll('.tab').forEach(el => el.onclick = () => showLessonsTab(el.dataset.tab));
@@ -202,6 +265,7 @@ function openLessonsRoom(room, tab){
 function showLessonsTab(tab){
   S.tab = tab;
   $('tabs').querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
+  if (tab === 'queue') return openQueuePage();
   ({ series: renderSeries, pinned: renderPinned, members: renderMembers, cmembers: renderCohortMembersAdmin })[tab]();
 }
 async function renderSeries(){
@@ -288,18 +352,18 @@ async function openCohortDays(c){
   S.current = { type:'cohort', room, cohort: c };
   $('room-title').textContent = c.name;
   $('tabs').innerHTML = `<div class="tab" data-tab="back">‹ ${esc(room?.name || 'シリーズ')}</div>`;
-  $('tabs').querySelector('[data-tab="back"]').onclick = () => openLessonsRoom(room);
+  $('tabs').querySelector('[data-tab="back"]').onclick = () => openLessonsList(room, 'series');
   updatePinBtn(); highlightNav();
   $('page').innerHTML = `<div class="empty">読み込み中…</div>`;
   const editor = canEditCohort(c);
   const cm = myCMFor(c.id);
-  if (!editor && !cm?.paid_at) {
+  if (!editor && !cm) {
     $('page').innerHTML = `
       <div class="card"><h3><span class="bar"></span>${esc(c.name)}</h3>
         ${c.intro ? `<div class="ch-intro">${richText(c.intro)}</div>` : ''}
       </div>
       <div class="card"><h3><span class="bar"></span>お申し込み</h3>
-        <p class="sub" style="margin-bottom:14px">お支払いの確認ができると、ここに毎朝のレッスンが並びます。</p>
+        <p class="sub" style="margin-bottom:14px">お申し込みいただくと、毎朝のレッスンをここで読めます。</p>
         ${c.price_jpy != null ? `<div class="kv"><b>参加費</b>¥${Number(c.price_jpy).toLocaleString('ja-JP')}</div>` : ''}
         ${c.payment_info ? `<div class="kv stack"><b>お支払い</b><span>${richText(c.payment_info)}</span></div>` : ''}
         ${c.payment_url ? `<a class="zoom-btn" href="${esc(c.payment_url)}" target="_blank" rel="noopener">${payLabel(c.payment_url)}</a>` : ''}
@@ -345,8 +409,8 @@ function drawDays(){
     </div>` : ''}
     ${c.intro ? `<div class="card"><h3><span class="bar"></span>${esc(c.name)}</h3>
       <div class="ch-intro" style="margin-bottom:0">${richText(c.intro)}</div></div>` : ''}
-    ${editor && (c.price_jpy != null || c.payment_info || c.payment_url) ? `<div class="card" style="background:#faf9f8">
-      <h3><span class="bar"></span>参加者に見えるお支払いの案内<span class="muted" style="margin-left:auto;font-weight:400">入金確認がつくまで表示されます</span></h3>
+    ${(editor || (myCMFor(c.id) && !myCMFor(c.id).paid_at)) && (c.price_jpy != null || c.payment_info || c.payment_url) ? `<div class="card" style="background:#faf9f8">
+      <h3><span class="bar"></span>${editor ? '参加者に見えるお支払いの案内' : 'お支払いのご案内'}<span class="muted" style="margin-left:auto;font-weight:400">${editor ? '入金確認がつくまで表示されます' : 'お支払いの確認待ち'}</span></h3>
       ${c.price_jpy != null ? `<div class="kv"><b>参加費</b>¥${Number(c.price_jpy).toLocaleString('ja-JP')}</div>` : ''}
       ${c.payment_info ? `<div class="kv stack"><b>お支払い</b><span>${richText(c.payment_info)}</span></div>` : ''}
       ${c.payment_url ? `<a class="zoom-btn" href="${esc(c.payment_url)}" target="_blank" rel="noopener">${payLabel(c.payment_url)}</a>` : ''}
@@ -387,6 +451,8 @@ async function openLesson(l, opts = {}){
   updatePinBtn(); highlightNav();
   $('page').innerHTML = `<div class="empty">読み込み中…</div>`;
   const editor = canEditCohort(c);
+  // 前後の Day を出すために、この期の回を持っていなければ読む
+  if (c && !(L.lessons.length && L.lessons[0].cohort_id === c.id)) { try { await loadCohortLessons(c); } catch {} }
   const [{ data: cms, error }, { data: rx }, { data: pn }, img] = await Promise.all([
     supa.from('lesson_comments').select('*').eq('lesson_id', l.id).order('created_at'),
     supa.from('lesson_reactions').select('*').eq('target_type', 'lesson').eq('target_id', l.id),
@@ -414,6 +480,17 @@ async function openLesson(l, opts = {}){
   const pinned = !!L.pins['lesson:' + l.id];
   const top = comments.filter(x => !x.parent_id);
   const replies = id => comments.filter(x => x.parent_id === id);
+  // 自分のコメントに付いた返信は、この画面を開いた時点で「見た」ことにする
+  if (!editor) {
+    const myTop = new Set(top.filter(x => x.user_id === S.user.id).map(x => x.id));
+    const got = comments.filter(x => x.parent_id && myTop.has(x.parent_id) && x.user_id !== S.user.id).map(x => x.id);
+    if (got.length) { markRepliesSeen(got); refreshReplyCount(); }
+  }
+  // 前後の Day（参加者は公開済みだけ）
+  const nowT = Date.now();
+  const seq = L.lessons.filter(x => x.cohort_id === l.cohort_id && (editor || (x.publish_at && new Date(x.publish_at).getTime() <= nowT)));
+  const idx = seq.findIndex(x => x.id === l.id);
+  const prevL = idx > 0 ? seq[idx - 1] : null, nextL = idx >= 0 && idx < seq.length - 1 ? seq[idx + 1] : null;
 
   const cmHtml = x => {
     const del = !!x.deleted_at;
@@ -459,7 +536,11 @@ async function openLesson(l, opts = {}){
       </div>
       ${likeNames.length ? `<div class="likenames">${likeNames.slice(0, 6).map(n => esc(n) + 'さん').join('、')}${likeNames.length > 6 ? `、ほか${likeNames.length - 6}人` : ''}</div>` : ''}
     </div>
-    <div class="card">
+    <div class="daynav">
+      ${prevL ? `<button class="act" data-goday="${prevL.id}">← Day ${prevL.day_no}</button>` : '<span></span>'}
+      ${nextL ? `<button class="act" data-goday="${nextL.id}">Day ${nextL.day_no} →</button>` : '<span></span>'}
+    </div>
+    <div class="card" id="comments">
       <h3><span class="bar"></span>コメント<span class="muted" style="margin-left:auto;font-weight:400">${top.length}件</span></h3>
       ${threadHtml}
       <div class="composer" id="composer">
@@ -467,6 +548,12 @@ async function openLesson(l, opts = {}){
         <button class="send" id="csend">↑</button>
       </div>
     </div>`;
+
+  // タブの位置に「コメントへ ↓」「未返信 →」を置く（本文が長くても、コメントにすぐ行ける）
+  $('tabs').insertAdjacentHTML('beforeend', `<div class="tab" data-tab="comments">コメント ${top.length}件 ↓</div>${editor && L.queueCount ? `<div class="tab" data-tab="queue">未返信 ${L.queueCount} →</div>` : ''}`);
+  $('tabs').querySelector('[data-tab="comments"]').onclick = () => $('comments').scrollIntoView({ block:'start', behavior:'smooth' });
+  const qt = $('tabs').querySelector('[data-tab="queue"]'); if (qt) qt.onclick = () => openNextUnanswered();
+  $('page').querySelectorAll('[data-goday]').forEach(el => el.onclick = () => openLesson(L.lessons.find(x => x.id === el.dataset.goday)));
 
   const cin = $('cin');
   const grow = ta => { ta.style.height = 'auto'; ta.style.height = Math.min(160, ta.scrollHeight) + 'px'; };
@@ -476,12 +563,20 @@ async function openLesson(l, opts = {}){
     const { error } = await supa.from('lesson_comments').insert({ lesson_id: l.id, user_id: S.user.id, parent_id: parentId || null, body: body.trim() });
     if (error) return toast('送信に失敗しました：' + error.message);
     if (ta) ta.value = '';
+    // ⭕️から入って返信したときは、次の未返信へ自動で進む
+    if (editor && parentId && L.queueMode) {
+      const n = await refreshQueueCount();
+      if (n && await openNextUnanswered(l.id)) { toast(`返信しました。次の未返信へ（残り ${n}）`); return; }
+      L.queueMode = false;
+      toast('返信しました。未返信はもうありません');
+      openLesson(l, { scrollTo: parentId }); return;
+    }
     toast(parentId ? '返信しました' : 'コメントを送りました');
     if (editor) refreshQueueCount();
-    openLesson(l);
+    openLesson(l, parentId ? { scrollTo: parentId } : { keepScroll: true });
   };
   $('csend').onclick = () => post(cin.value, null, cin);
-  cin.onkeydown = e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) post(cin.value, null, cin); };
+  cin.onkeydown = e => enterToSend(e, () => post(cin.value, null, cin));
   $('l-like').onclick = () => toggleReaction('lesson', l.id, iLike).then(() => openLesson(l));
   $('l-pin').onclick = () => togglePin('lesson', l.id).then(() => openLesson(l));
   const le = $('l-edit'); if (le) le.onclick = e => { e.preventDefault(); openPostPage(l, c); };
@@ -498,13 +593,24 @@ async function openLesson(l, opts = {}){
     if (slot.innerHTML) { slot.innerHTML = ''; return; }
     slot.innerHTML = `<div class="composer" style="margin-top:8px;border:none;padding-top:0"><textarea class="cinput" rows="1" placeholder="返信を書く…" id="rin-${id}"></textarea><button class="send" id="rsend-${id}">↑</button></div>`;
     const ta = $('rin-' + id); ta.focus(); ta.oninput = () => grow(ta);
-    ta.onkeydown = e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) post(ta.value, id, ta); };
+    ta.onkeydown = e => enterToSend(e, () => post(ta.value, id, ta));
     $('rsend-' + id).onclick = () => post(ta.value, id, ta);
   };
   $('page').querySelectorAll('[data-creply]').forEach(el => el.onclick = () => openReply(el.dataset.creply));
   if (opts.replyTo) { openReply(opts.replyTo); const el = $('c-' + opts.replyTo); if (el) el.scrollIntoView({ block:'center' }); }
   else if (opts.scrollTo) { const el = $('c-' + opts.scrollTo); if (el) el.scrollIntoView({ block:'center' }); }
+  else if (opts.keepScroll) { $('comments').scrollIntoView({ block:'end' }); }
   else document.querySelector('.content').scrollTop = 0;
+}
+/* Enter で送信、Shift+Enter で改行。日本語入力の変換確定 Enter では送らない。
+   スマホ（指で操作）ではキーボードの Enter は改行のまま。送信は ↑ ボタン。 */
+function enterToSend(e, send){
+  if (e.key !== 'Enter') return;
+  if (e.isComposing || e.keyCode === 229) return;
+  if (e.metaKey || e.ctrlKey) { e.preventDefault(); send(); return; }
+  if (e.shiftKey) return;
+  if (window.matchMedia('(pointer:coarse)').matches) return;
+  e.preventDefault(); send();
 }
 async function toggleReaction(type, id, on){
   const q = on
@@ -596,6 +702,20 @@ async function fetchQueue(){
       && !comments.some(r => r.parent_id === x.id && eds.has(r.user_id)))
     .map(x => ({ c: x, lesson: lessons.find(l => l.id === x.lesson_id) }));
 }
+/* ⭕️を押したとき：一覧を挟まず、一番古い未返信コメントの場所を開き、返信欄を出す。
+   afterLessonId を渡すと、同じ回に残りがあればそれを優先する（続けて返すときに画面が飛ばない）。 */
+async function openNextUnanswered(afterLessonId){
+  const q = await fetchQueue();
+  L.queueCount = q.length; refreshQueueBadge();
+  if (!q.length) return false;
+  const item = q.find(x => x.lesson.id === afterLessonId) || q[0];
+  const { data } = await supa.from('lessons').select('*').eq('id', item.lesson.id).single();
+  if (!data) return false;
+  L.queueMode = true;
+  L.cohort = L.cohorts.find(c => c.id === data.cohort_id);
+  await openLesson(data, { replyTo: item.c.id });
+  return true;
+}
 async function openQueuePage(){
   leaveChat();
   S.current = { type:'queue' };
@@ -619,13 +739,15 @@ async function openQueuePage(){
     const { data } = await supa.from('lessons').select('*').eq('id', el.dataset.ql).single();
     if (!data) return;
     L.cohort = L.cohorts.find(c => c.id === data.cohort_id);
+    L.queueMode = true;
     openLesson(data, { replyTo: el.dataset.q });
   });
 }
 /* 未返信の件数は、サイドバーの 21 Lessons の行に出す（editor 以上にだけ見えます） */
 function refreshQueueBadge(){
+  const n = editorOfLessons() ? L.queueCount : L.replyCount;
   const b = document.querySelector('[data-queue-badge]');
-  if (b && L.queueCount) { b.textContent = L.queueCount; return; }
+  if (b && n) { b.textContent = n; return; }
   renderNav(); highlightNav();
 }
 
@@ -874,7 +996,7 @@ function openCohortModal(c, room){
     const fresh = c ? (L.cohorts.find(x => x.id === c.id) || c) : null;
     if (S.current?.type === 'cohort' && fresh) openCohortDays(fresh);
     else if (S.current?.type === 'room') renderSeries();
-    else openLessonsRoom(room);
+    else openLessonsList(room, 'series');
   };
 }
 
