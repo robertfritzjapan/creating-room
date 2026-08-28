@@ -173,6 +173,45 @@ async function openRoomAbout(room){
     };
   }
 }
+/* 期の説明ページ（1の階層）。上部バーの期名からいつでも戻れる */
+async function openCohortAbout(c){
+  if (!c) return;
+  const room = cohortRoom(c);
+  leaveChat();
+  L.cohort = c;
+  S.current = { type:'cohort', room, cohort: c, view:'about' };
+  const editor = canEditCohort(c);
+  const cm = myCMFor(c.id);
+  cohortTabs(c, 'about');
+  updatePinBtn(); highlightNav();
+  const unpaid = cm && !cm.paid_at && !editor;
+  $('page').innerHTML = `
+    <div class="card about-card">
+      <h2 class="about-title">${esc(c.name)}${c.period_label ? `<span class="muted" style="margin-left:10px;font-weight:400;font-size:14px">${esc(c.period_label)}</span>` : ''}</h2>
+      ${c.intro ? `<div class="ch-intro">${richText(c.intro)}</div>` : '<p class="muted">紹介文は準備中です。</p>'}
+      ${c.starts_on ? `<div class="kv"><b>開始</b>${fmtDateJ(c.starts_on)}${c.total_sessions ? `（${c.total_sessions}日）` : ''}</div>` : ''}
+      ${c.price_jpy != null ? `<div class="kv"><b>参加費</b>¥${Number(c.price_jpy).toLocaleString('ja-JP')}</div>` : ''}
+    </div>
+    ${(cm || editor)
+      ? `<div class="card" style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="primary-btn" id="ca-chat">チャットへ</button>
+          <button class="ghost-btn" id="ca-days" style="margin:0">レッスン一覧へ</button>
+          ${editor ? `<button class="ghost-btn" id="ca-edit" style="margin:0">✏️ この期を編集</button>` : ''}
+        </div>`
+      : `<div class="card">
+          ${c.payment_info ? `<div class="kv stack"><b>お支払い</b><span>${richText(c.payment_info)}</span></div>` : ''}
+          <button class="primary-btn" style="margin-top:10px" id="ca-join">${c.payment_url ? '申し込む' : '参加する'}</button>
+        </div>`}
+    ${unpaid && (c.payment_info || c.payment_url) ? `<div class="card" style="background:#faf9f8">
+      <h3><span class="bar"></span>お支払いのご案内<span class="muted" style="margin-left:auto;font-weight:400">お支払いの確認待ち</span></h3>
+      ${c.payment_info ? `<div class="kv stack"><b>お支払い</b><span>${richText(c.payment_info)}</span></div>` : ''}
+      ${c.payment_url ? `<a class="zoom-btn" href="${esc(c.payment_url)}" target="_blank" rel="noopener">${payLabel(c.payment_url)}</a>` : ''}
+    </div>` : ''}`;
+  const ch = $('ca-chat'); if (ch) ch.onclick = () => openCohortChat(c);
+  const dy = $('ca-days'); if (dy) dy.onclick = () => openCohortDays(c);
+  const ed = $('ca-edit'); if (ed) ed.onclick = () => openCohortModal(c, room);
+  const jn = $('ca-join'); if (jn) jn.onclick = () => joinCohort(c.id, room);
+}
 async function joinCohort(cohortId, room){
   const c = L.cohorts.find(x => x.id === cohortId);
   const { error } = await supa.from('cohort_members').insert({ cohort_id: cohortId, user_id: S.user.id });
@@ -265,7 +304,7 @@ async function renderSeries(){
     </div>`;
   h += sec('受講中', g.active) + sec('募集中', g.open, '1日以降の途中参加もできます') + sec('これまでに受けた回', g.past) + (editor ? sec('準備中', g.draft) : '');
   if (openFiltered.length) h += `<div class="card"><h3><span class="bar"></span>募集中</h3>${openFiltered.map(c => `
-      <div class="lrow" data-cohort-about="1">
+      <div class="lrow" data-cohort-about="${c.id}">
         <div class="lico">${c.total_sessions || 21}</div>
         <div class="lmain"><div class="lt1">${esc(c.name)}${tagChips(c)}</div><div class="lt2">${esc(c.period_label || '')}${c.price_jpy != null ? `　¥${Number(c.price_jpy).toLocaleString('ja-JP')}` : ''}</div></div>
         <div class="lright"><span class="pill-open">募集中</span></div>
@@ -282,8 +321,8 @@ async function renderSeries(){
   $('page').querySelectorAll('[data-cedit]').forEach(el => el.onclick = e => {
     e.stopPropagation(); openCohortModal(L.cohorts.find(c => c.id === el.dataset.cedit), room);
   });
-  $('page').querySelectorAll('[data-cohort-about]').forEach(el => el.onclick = () => openRoomAbout(room));
-  const gp = $('go-post'); if (gp) gp.onclick = () => openPostPage();
+    $('page').querySelectorAll('[data-cohort-about]').forEach(el => el.onclick = () => openCohortAbout(L.cohorts.find(c => c.id === el.dataset.cohortAbout)));
+   const gp = $('go-post'); if (gp) gp.onclick = () => openPostPage();
   const gq = $('go-queue'); if (gq) gq.onclick = () => openQueuePage();
   const ac = $('add-cohort'); if (ac) ac.onclick = () => openCohortModal(null, room);
 }
@@ -1064,10 +1103,12 @@ function cohortTabs(c, active, sub){
   const room = cohortRoom(c), editor = canEditCohort(c);
   $('room-title').textContent = c.name + (sub ? ' › ' + sub : '');
   $('tabs').innerHTML = `<div class="tab" data-tab="back">‹ ${esc(room?.name || '21 Lessons')}</div>
+    <div class="tab ${active === 'about' ? 'active' : ''}" data-tab="about">${esc(c.name)}</div>
     <div class="tab ${active === 'chat' ? 'active' : ''}" data-tab="chat">チャット</div>
     <div class="tab ${active === 'days' ? 'active' : ''}" data-tab="days">レッスン一覧</div>
     ${editor && L.queueCount ? `<div class="tab" data-tab="queue">未返信 ${L.queueCount} →</div>` : ''}`;
   $('tabs').querySelector('[data-tab="back"]').onclick = () => openLessonsList(room, 'series');
+  $('tabs').querySelector('[data-tab="about"]').onclick = () => openCohortAbout(c);
   $('tabs').querySelector('[data-tab="chat"]').onclick = () => openCohortChat(c);
   $('tabs').querySelector('[data-tab="days"]').onclick = () => openCohortDays(c);
   const qt = $('tabs').querySelector('[data-tab="queue"]'); if (qt) qt.onclick = () => openNextUnanswered();
