@@ -14,6 +14,7 @@ const L = {
   postDraft: null,    // 入稿画面の状態
   queueCount: 0,
   replyCount: 0,      // 参加者：自分のコメントに付いた、まだ見ていない返信の数
+  inboxCount: 0,      // なんでも窓口：事務局は未返信、相談者は届いた返事の数
   queueMode: false,   // editor：⭕️から入った「未返信を順に返す」モード
 };
 
@@ -45,6 +46,7 @@ async function lessonsBootstrap(){
   L.editorRooms = S.memberships.filter(x => ['admin','editor'].includes(x.role)).map(x => x.room_id);
   L.postDraft = null;
   if (editorOfLessons()) refreshQueueCount(); else refreshActivityCount();
+  refreshInboxCount();
 }
 const editorOfLessons = () => S.rooms.some(r => isLessonsRoom(r) && canEdit(r.id));
 const editorCohorts = () => L.cohorts.filter(c => canEditCohort(c));
@@ -1096,6 +1098,39 @@ async function refreshActivityCount(){
   L.replyCount = await fetchNewActivityCount();
   refreshQueueBadge();
   return L.replyCount;
+}
+
+/* ============================================================
+   なんでも窓口の⭕️
+   事務局（admin/editor）：最後の発言が相談者で、まだ解決済みでないもの＝未返信
+   相談者：最後の発言が自分ではなく、前に開いたあとに来ているもの＝返事が届いている
+   ============================================================ */
+async function fetchInboxCount(){
+  const entrance = S.rooms.find(r => r.slug === 'entrance');
+  if (!entrance || !isMember(entrance.id)) return 0;
+  const admin = canEdit(entrance.id);
+  let q = supa.from('inquiries').select('id, user_id, status, user_seen_at').eq('room_id', entrance.id);
+  if (!admin) q = q.eq('user_id', S.user.id);
+  const { data: inqs } = await q;
+  const list = (inqs || []).filter(i => admin ? i.status !== 'resolved' : true);
+  if (!list.length) return 0;
+  const { data: ms } = await supa.from('inquiry_messages')
+    .select('inquiry_id, sender_id, created_at')
+    .in('inquiry_id', list.map(i => i.id)).order('created_at');
+  const byInq = {};
+  (ms || []).forEach(m => (byInq[m.inquiry_id] = byInq[m.inquiry_id] || []).push(m));
+  return list.filter(i => {
+    const last = (byInq[i.id] || []).at(-1);
+    if (!last) return false;
+    return admin
+      ? last.sender_id === i.user_id
+      : last.sender_id !== S.user.id && (!i.user_seen_at || last.created_at > i.user_seen_at);
+  }).length;
+}
+async function refreshInboxCount(){
+  L.inboxCount = await fetchInboxCount();
+  renderNav(); highlightNav();
+  return L.inboxCount;
 }
 
 /* 期の中では上のバーを固定する：‹ 部屋 ｜ チャット ｜ レッスン一覧（＋editor の未返信） */

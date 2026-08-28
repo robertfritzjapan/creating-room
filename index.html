@@ -1009,7 +1009,7 @@ function renderNav(){
   const note = S.rooms.find(r => isNoteRoom(r) && isMember(r.id));
   let h = `<div class="nav-label">${t('ホーム')}</div>
     <div class="nav-item" data-nav="home"><span class="dot"></span>${t('新着フィード')}</div>`;
-  if (entrance) h += `<div class="nav-item" data-nav="inbox"><span class="dot"></span>${t('なんでも窓口')}</div>`;
+  if (entrance) h += `<div class="nav-item" data-nav="inbox"><span class="dot"></span><span class="nav-name">${t('なんでも窓口')}</span>${L.inboxCount ? `<span class="nav-badge" title="${canEdit(entrance.id) ? t('未返信') : '返事が届いています'}">${L.inboxCount}</span>` : ''}</div>`;
   h += `<div class="nav-item" data-nav="pins"><span class="dot"></span>${t('ピンした場所')}</div>`;
   // 道そのもの。カテゴリの見出しを付けず、ホームのすぐ下に置く
   if (entrance || note) h += `<div style="height:12px"></div>`;
@@ -1811,6 +1811,12 @@ async function renderChat(){
     : `<div class="empty">${isAdmin ? 'まだ質問は届いていません' : 'まだ質問したことはありません'}</div>`;
 
   $('page').innerHTML = `<div class="q-wrap">${newFormHtml}${listHtml}</div>`;
+
+  if (!isAdmin && sorted.length) {
+    await supa.from('inquiries').update({ user_seen_at: new Date().toISOString() })
+      .in('id', sorted.map(i => i.id)).eq('user_id', S.user.id);
+  }
+  refreshInboxCount();
 
   const nb = $('q-new-send');
   if (nb) nb.onclick = async () => {
