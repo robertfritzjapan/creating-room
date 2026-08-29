@@ -23,8 +23,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--washi);color:var(--i
 .serif{font-family:'Shippori Mincho',serif}
 button{font-family:inherit}
 a{color:var(--ai)}
-.about-intake{font-size:14px;margin-bottom:12px}
-  
+
 /* ===== Layout ===== */
 .app{display:flex;min-height:100vh}
 .sidebar{
@@ -68,29 +67,6 @@ a{color:var(--ai)}
 .tab{padding:18px 12px;font-size:15.5px;color:#3a3a40;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
 .tab:hover{color:var(--ink)}
 .tab.active{color:var(--ai);border-bottom-color:var(--ai);font-weight:600}
-.daynav{display:flex;justify-content:space-between;margin:-8px 0 14px}
-.intro-details summary{display:flex;align-items:center;gap:8px;cursor:pointer;font-family:'Shippori Mincho',serif;font-size:17px;list-style:none}
-.intro-details summary::-webkit-details-marker{display:none}
-.intro-details summary::after{content:'▸';margin-left:auto;color:var(--gray);font-size:13px}
-.intro-details[open] summary::after{content:'▾'}
-/* 期のチャット */
-.chat-cols{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:18px;align-items:start}
-.chat-cols .chat-wrap{height:calc(100vh - 130px)}
-.lib-col{position:sticky;top:0}
-.lesson-bubble{background:#fff;border:1px solid var(--line);border-left:3px solid var(--ai);border-radius:0 12px 12px 12px;padding:12px 14px;max-width:92%;cursor:pointer}
-.lesson-bubble:hover{background:var(--washi)}
-.lb-img{width:100%;height:120px;background-size:cover;background-position:center;border-radius:8px;margin-bottom:10px}
-.lb-text{font-size:14.5px;line-height:1.7;color:var(--ink)}
-.lb-more{font-size:12.5px;color:var(--ai);font-weight:600;margin-top:8px}
-.msg-quote{font-size:11.5px;color:var(--gray);border-left:2px solid var(--line);padding:2px 8px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:92%}
-.msg-tools{margin-top:3px}
-.msg-tools button{background:none;border:none;color:var(--gray);font-size:11px;cursor:pointer;padding:0 8px 0 0}
-.msg-tools button:hover{color:var(--ai)}
-.msg.mine .msg-tools{text-align:right}
-.reply-chip{display:flex;align-items:center;gap:10px;padding:6px 14px 0;font-size:12px;color:var(--ai)}
-.reply-chip button{background:none;border:none;color:var(--gray);font-size:14px;cursor:pointer}
-@media (max-width:900px){.chat-cols{grid-template-columns:1fr}.lib-col{display:none}.chat-cols .chat-wrap{height:calc(100vh - 175px)}}
-.daynav .act{border:1px solid var(--line);border-radius:8px;padding:8px 14px;background:#fff;cursor:pointer;font-size:13.5px}
 .content{flex:1;overflow-y:auto;padding:24px 20px;-webkit-overflow-scrolling:touch}
 .page{max-width:860px;margin:0 auto}
 
@@ -486,8 +462,8 @@ a{color:var(--ai)}
 .cn-act{display:flex;gap:8px;align-items:flex-start;margin-bottom:7px}
 .cn-act .cn-ta{min-height:44px;flex:1}
 .cs-no{flex:0 0 18px;text-align:center;font-size:12.5px;color:var(--gray);padding-top:12px}
-.cn-min{width:62px;flex:0 0 62px;border:1px solid var(--line);border-radius:6px;
-  padding:11px 4px;font-size:14px;font-family:inherit;text-align:center;outline:none;background:#fff}
+.cn-min{width:120px;flex:0 0 120px;border:1px solid var(--line);border-radius:6px;
+  padding:11px 10px;font-size:14px;font-family:inherit;outline:none;background:#fff}
 .cn-min:focus{border-color:var(--ai)}
 /* はじめかたの Creatingノート タブ：カードは「見出し＋1行」まで。残りは「くわしく」の中 */
 .sec-card h3{margin-bottom:7px}
@@ -514,8 +490,8 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
 .cn-meta b{font-weight:600;color:var(--ink)}
 .cn-act{display:flex;gap:8px;align-items:flex-start;margin-bottom:8px}
 .cn-act .cn-ta{min-height:46px;flex:1}
-.cn-min{width:76px;flex:0 0 76px;border:1px solid var(--line);border-radius:8px;
-  padding:12px 6px;font-size:14px;font-family:inherit;text-align:center;outline:none;background:#fff}
+.cn-min{width:104px;flex:0 0 104px;border:1px solid var(--line);border-radius:8px;
+  padding:12px 10px;font-size:14px;font-family:inherit;outline:none;background:#fff}
 .cn-min:focus{border-color:var(--ai)}
 .cn-bar{display:flex;gap:10px;margin-top:22px;flex-wrap:wrap}
 .cn-bar button{flex:1;min-width:150px;margin:0}
@@ -829,7 +805,7 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
 <script>
 /* ================= 設定 ================= */
 if (!window.supabase) { document.getElementById('boot').textContent = '読み込みに失敗しました。再読み込みしてください。'; throw new Error('supabase-js not loaded'); }
-const SUPABASE_URL = 'https://bjicovhhjcyjtpqgscig.supabase.co';
+const SUPABASE_URL = 'https://auth.robertfritzjapan.com';   // カスタムドメイン。旧: bjicovhhjcyjtpqgscig.supabase.co
 const SUPABASE_KEY = 'sb_publishable_i9iXMSoR0J-gmHsXxiuL3Q_V29e62aM';
 const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const APP_URL = location.origin + location.pathname;
@@ -1009,7 +985,7 @@ function renderNav(){
   const note = S.rooms.find(r => isNoteRoom(r) && isMember(r.id));
   let h = `<div class="nav-label">${t('ホーム')}</div>
     <div class="nav-item" data-nav="home"><span class="dot"></span>${t('新着フィード')}</div>`;
-  if (entrance) h += `<div class="nav-item" data-nav="inbox"><span class="dot"></span><span class="nav-name">${t('なんでも窓口')}</span>${L.inboxCount ? `<span class="nav-badge" title="${canEdit(entrance.id) ? t('未返信') : '返事が届いています'}">${L.inboxCount}</span>` : ''}</div>`;
+  if (entrance) h += `<div class="nav-item" data-nav="inbox"><span class="dot"></span>${t('なんでも窓口')}</div>`;
   h += `<div class="nav-item" data-nav="pins"><span class="dot"></span>${t('ピンした場所')}</div>`;
   // 道そのもの。カテゴリの見出しを付けず、ホームのすぐ下に置く
   if (entrance || note) h += `<div style="height:12px"></div>`;
@@ -1021,8 +997,7 @@ function renderNav(){
     h += `<div class="nav-label">${t(label)}</div>` + rooms.map(r => {
       const member = isMember(r.id);
       const open = !member && L.cohorts.some(c => c.room_id === r.id && c.status === 'open');
-      const bn = isLessonsRoom(r) ? (canEdit(r.id) ? L.queueCount : L.replyCount) : 0;
-      const unread = bn ? `<span class="nav-badge" data-queue-badge title="${canEdit(r.id) ? t('未返信') : '返信が届いています'}">${bn}</span>` : '';
+      const unread = (isLessonsRoom(r) && canEdit(r.id) && L.queueCount) ? `<span class="nav-badge" data-queue-badge title="${t('未返信')}">${L.queueCount}</span>` : '';
       const badge = unread || (open ? `<span class="nav-tag">${t('募集中')}</span>`
         : (!member && r.visibility === 'public') ? `<button class="join-mini" data-join="${r.id}">${t('参加')}</button>` : '');
       return `<div class="nav-item ${member ? '' : 'locked'}" data-nav="${r.id}"><span class="dot"></span><span class="nav-name">${esc(t(r.name))}${r.subtitle && !member ? `<span class="nav-sub">${esc(r.subtitle)}</span>` : ''}</span>${badge}</div>`;
@@ -1174,7 +1149,7 @@ function cnEntryText(k, e){
   if (e.reflect) s += `きのう：${e.reflect}\n`;
   if (e.goal)    s += `望む成果：${e.goal}\n`;
   if (e.reality) s += `いまの現実：${e.reality}\n`;
-  if (e.actions?.length) s += '今日すること：\n' + e.actions.map(a => `・${a.text}${a.min ? `（${a.min}分）` : ''}`).join('\n') + '\n';
+  if (e.actions?.length) s += '今日すること：\n' + e.actions.map(a => `・${a.text}${a.min ? `（${a.min}）` : ''}`).join('\n') + '\n';
   return s;
 }
 async function renderNote(hasRoom){
@@ -1199,7 +1174,7 @@ async function renderNote(hasRoom){
   const actRow = (i, a) => `<div class="cn-act">
       <div class="cs-no">${i + 1}</div>
       <textarea class="cn-ta cn-act-t" rows="1">${esc(a?.text || '')}</textarea>
-      <input class="cn-min cn-act-m" inputmode="numeric" placeholder="分" value="${esc(a?.min || '')}">
+      <input class="cn-min cn-act-m" placeholder="いつやる" value="${esc(a?.min || '')}">
     </div>`;
   const rowCount = Math.min(CN_ROW_MAX, Math.max(3, acts.length + 1));   // 書いた数＋空き1行。最低3行
   const yest = lastKey && data[lastKey]?.goal ? `
@@ -1802,7 +1777,7 @@ async function renderChat(){
       <p class="sub">${inbox
         ? 'ご質問、ご要望、感想、体験セッションのご希望など、なんでもどうぞ。ここに書いたことは、あなたと事務局だけが見られます。'
         : 'ここで送った質問は、あなたと事務局だけが見られます。'}</p>
-      <textarea class="form-input" id="q-new-body" rows="3" placeholder="${inbox ? '体験セッションに興味があります' : '聞きたいことを書いてください'}"></textarea>
+      <textarea class="form-input" id="q-new-body" rows="3" placeholder="${inbox ? '書きかけでも大丈夫です' : '聞きたいことを書いてください'}"></textarea>
       <button class="primary-btn" style="margin-top:10px" id="q-new-send">${inbox ? '送る' : '質問を送る'}</button>
     </div>` : '';
 
@@ -1811,12 +1786,6 @@ async function renderChat(){
     : `<div class="empty">${isAdmin ? 'まだ質問は届いていません' : 'まだ質問したことはありません'}</div>`;
 
   $('page').innerHTML = `<div class="q-wrap">${newFormHtml}${listHtml}</div>`;
-
-  if (!isAdmin && sorted.length) {
-    await supa.from('inquiries').update({ user_seen_at: new Date().toISOString() })
-      .in('id', sorted.map(i => i.id)).eq('user_id', S.user.id);
-  }
-  refreshInboxCount();
 
   const nb = $('q-new-send');
   if (nb) nb.onclick = async () => {
