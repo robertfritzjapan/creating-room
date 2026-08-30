@@ -395,7 +395,7 @@ function drawDays(){
   if (!editor) {
     const next = maxDay + 1;
     if (next <= total && c.status !== 'past') {
-      rows += `<div class="lrow dim"><div class="lico plain">${next}</div><div class="lmain"><div class="lt1">Day ${next}</div><div class="lt2">明日</div></div></div>`;
+      rows += `<div class="lrow dim"><div class="lico plain">${next}</div><div class="lmain"><div class="lt1">Day ${next}</div><div class="lt2">${nextDayLabel(c)}</div></div></div>`;
       if (total - next > 0) rows += `<div class="lrow dim" style="border:none"><div class="lico plain">…</div><div class="lmain"><div class="lt2">残り ${total - next} 日</div></div></div>`;
     }
   } else if (L.lessons.length < total) {
@@ -746,6 +746,14 @@ function refreshQueueBadge(){
 /* ============================================================
    入稿（Danna・iPhone 前提）
    ============================================================ */
+/* 次の回がいつ届くか：開始前なら開始日、開始後は「明日」 */
+function nextDayLabel(c){
+  if (c?.starts_on) {
+    const start = new Date(c.starts_on + 'T06:00:00+09:00');
+    if (start.getTime() > Date.now()) return fmtDay(start.toISOString());
+  }
+  return '明日';
+}
 function tomorrow6amJST(){
   const p = new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Tokyo', year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(new Date());
   const g = t => Number(p.find(x => x.type === t).value);
@@ -805,7 +813,7 @@ async function openPostPage(lesson, cohort, forceNew){
   updatePinBtn(); highlightNav();
   if (d.imagePath && !d.imageUrl) d.imageUrl = await lessonImageUrl(d.imagePath);
   const isPublished = lesson?.publish_at && new Date(lesson.publish_at) <= new Date();
-  const whenLabel = { now:'出す', am:'明朝 6:00 に出す', keep: isPublished ? '更新する' : '保存する' };
+  const whenLabel = { now:'出す', am:'明朝 6:00 に出す', date:'その日の朝 6:00 に出す', keep: isPublished ? '更新する' : '保存する' };
   $('page').innerHTML = `
     <div class="postbar">
       <div class="postbar-t">${lesson ? (lesson.publish_at ? `Day ${d.day} を編集` : `Day ${d.day}（下書き）`) : 'レッスンを出す'}</div>
@@ -834,8 +842,10 @@ async function openPostPage(lesson, cohort, forceNew){
         ${lesson?.publish_at ? `<button data-w="keep" class="${d.when === 'keep' ? 'on' : ''}">${isPublished ? 'そのまま更新' : fmtWhen(lesson.publish_at) + ' のまま'}</button>` : ''}
         <button data-w="now" class="${d.when === 'now' ? 'on' : ''}">今すぐ出す</button>
         <button data-w="am" class="${d.when === 'am' ? 'on' : ''}">明朝 6:00 に出す</button>
+        <button data-w="date" class="${d.when === 'date' ? 'on' : ''}">日付を選ぶ</button>
       </div>
-      <div class="phint">${d.when === 'now' ? '押した瞬間に、参加者の画面に出ます' : d.when === 'am' ? '前の晩に書けたときだけ使います。朝6時に自動で出ます' : '公開のタイミングは変えません'}</div>
+      ${d.when === 'date' ? `<div style="margin-top:8px"><input type="date" id="p-date" class="pinput" style="max-width:200px" value="${d.date || ''}"></div>` : ''}
+      <div class="phint">${d.when === 'now' ? '押した瞬間に、参加者の画面に出ます' : d.when === 'am' ? '前の晩に書けたときだけ使います。朝6時に自動で出ます' : d.when === 'date' ? '選んだ日の朝6時に自動で出ます' : '公開のタイミングは変えません'}</div>
       <button class="pbig" id="p-go2" ${hasContent(d) ? '' : 'disabled'}>${whenLabel[d.when]}</button>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
         <button class="ghost-btn" id="p-back">${esc(c.name)} の一覧へ</button>
@@ -858,6 +868,7 @@ async function openPostPage(lesson, cohort, forceNew){
   dy.onchange = () => { d.day = Number(dy.value) || d.day; markDirty(); };
   const sel = $('p-cohort'); if (sel) sel.onchange = () => { L.postDraft = null; openPostPage(null, L.cohorts.find(x => x.id === sel.value)); };
   $('page').querySelectorAll('[data-w]').forEach(b => b.onclick = () => { d.when = b.dataset.w; openPostPage(lesson, c); });
+  const pdt = $('p-date'); if (pdt) pdt.onchange = () => { d.date = pdt.value; };
   const f = $('p-file');
   const pick = cap => { if (cap) f.setAttribute('capture', 'environment'); else f.removeAttribute('capture'); f.click(); };
   const pl = $('p-lib'), pc = $('p-cam'); if (pl) pl.onclick = () => pick(false); if (pc) pc.onclick = () => pick(true);
@@ -909,7 +920,8 @@ async function openPostPage(lesson, cohort, forceNew){
   async function publishLesson(){
     if (!hasContent(d)) return;
     clearTimeout(saveTimer);
-    const publish_at = d.when === 'now' ? new Date().toISOString() : d.when === 'am' ? tomorrow6amJST() : d.publishAt;
+    if (d.when === 'date' && !d.date) return toast('日付を選んでください');
+    const publish_at = d.when === 'now' ? new Date().toISOString() : d.when === 'am' ? tomorrow6amJST() : d.when === 'date' ? new Date(d.date + 'T06:00:00+09:00').toISOString() : d.publishAt;
     const row = { cohort_id: c.id, day_no: d.day, title: d.title.trim() || null, body: d.body.trim() || null, image_path: d.imagePath, publish_at };
     const { data, error } = d.lessonId
       ? await supa.from('lessons').update(row).eq('id', d.lessonId).select().single()
@@ -919,8 +931,8 @@ async function openPostPage(lesson, cohort, forceNew){
     const i = L.lessons.findIndex(x => x.id === data.id); if (i >= 0) L.lessons[i] = data; else if (L.cohort?.id === c.id) L.lessons.push(data);
     $('page').innerHTML = `<div class="card done">
       <div class="mk">✓</div>
-      <h2>${d.when === 'am' ? '明朝 6:00 に出ます' : `Day ${data.day_no} を出しました`}</h2>
-      <p>${d.when === 'am' ? 'いま書いたものは保存されています。<br>朝6時に自動で出ます。それまでは直せます。' : '参加者の画面に並びました。<br>コメントが付くと「未返信」に入ります。'}</p>
+      <h2>${d.when === 'am' ? '明朝 6:00 に出ます' : d.when === 'date' ? fmtDay(data.publish_at) + ' の朝 6:00 に出ます' : `Day ${data.day_no} を出しました`}</h2>
+      <p>${(d.when === 'am' || d.when === 'date') ? 'いま書いたものは保存されています。<br>その朝6時に自動で出ます。それまでは直せます。' : '参加者の画面に並びました。<br>コメントが付くと「未返信」に入ります。'}</p>
       <div class="sub"><b>${esc(data.title || '（タイトルなし）')}</b><br>本文 ${(data.body || '').length}文字${data.image_path ? '　／　画像 1枚' : '　／　画像なし'}<br>${esc(c.name)} ・ Day ${data.day_no}</div>
       <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px">
         <button class="add-res-btn" style="margin:0" id="d-next">次の回を書く</button>
