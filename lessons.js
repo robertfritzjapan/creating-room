@@ -124,13 +124,19 @@ async function openRoomAbout(room){
   highlightNav();
   const openC = L.cohorts.filter(c => c.room_id === room.id && c.status === 'open');
   const vis = room.visibility || 'invite';
-  let h = `<div class="card about-card">
+  const editor = canEdit(room.id);
+  // 編集者がプレビューで開いたとき：これは「まだ入っていない人」に見える画面だと分かるようにし、編集と戻るを出す
+  let h = editor ? `<div class="card" style="background:#faf9f8;display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:14px 18px">
+      <span class="muted" style="flex:1;min-width:180px">👀 この画面は、まだ入っていない人に見える紹介ページです</span>
+      <button class="add-res-btn" style="margin:0" id="about-edit">✏️ 紹介ページを編集</button>
+      <button class="ghost-btn" style="margin:0" id="about-back">部屋に戻る</button>
+    </div>` : '';
+  h += `<div class="card about-card">
     <h2 class="about-title">${esc(room.name)}</h2>
     ${room.subtitle ? `<p class="about-sub">${esc(room.subtitle)}</p>` : ''}
     ${room.about_what ? `<div class="about-kv"><div class="k">ここで何をするか</div><div class="v">${richText(room.about_what)}</div></div>` : ''}
-    ${room.about_who  ? `<div class="about-kv"><div class="k">誰が入っているか</div><div class="v">${richText(room.about_who)}</div></div>` : ''}
     ${room.about_how  ? `<div class="about-kv"><div class="k">入り方</div><div class="v">${richText(room.about_how)}</div></div>` : ''}
-    ${!room.about_what && !room.about_who && !room.about_how ? `<p class="muted">紹介文は準備中です。</p>` : ''}
+    ${!room.about_what && !room.about_how ? `<p class="muted">紹介文は準備中です。</p>` : ''}
   </div>`;
   if (vis === 'public') {
     h += `<div class="card"><p style="font-size:13px;margin-bottom:12px">どなたでも入れます。</p><button class="primary-btn" id="about-join">参加する</button></div>`;
@@ -157,6 +163,8 @@ async function openRoomAbout(room){
   </div>`;
 }
   $('page').innerHTML = h;
+  const ae = $('about-edit'); if (ae) ae.onclick = () => openAboutModal(room);
+  const ab = $('about-back'); if (ab) ab.onclick = () => openRoom(room);
   const j = $('about-join'); if (j) j.onclick = () => joinPublicRoom(room.id);
   $('page').querySelectorAll('[data-cohort-join]').forEach(el => el.onclick = () => joinCohort(el.dataset.cohortJoin, room));
   const nb = $('about-notify');
