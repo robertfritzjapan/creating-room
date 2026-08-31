@@ -311,6 +311,7 @@ a{color:var(--ai)}
 .about-kv{border-top:1px solid var(--line);padding:14px 0}
 .about-kv .k{font-size:10.5px;color:var(--ai);font-weight:700;letter-spacing:.05em;margin-bottom:3px}
 .about-kv .v{font-size:14.5px;line-height:1.85}
+.about-intake{font-size:14.5px;line-height:1.85;margin-bottom:12px}
 .nocta{border:1px dashed #d8d4d0;border-radius:7px;padding:14px;text-align:center;font-size:12.5px;color:var(--gray)}
 .ghost-btn{margin-top:10px;background:none;border:1px solid #d8d4d0;border-radius:20px;padding:6px 16px;font-size:12px;color:#6d6a67;cursor:pointer}
 .ghost-btn:hover,.ghost-btn.on{border-color:var(--ai);color:var(--ai)}
@@ -606,6 +607,31 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
   </div>
 </div>
 
+<!-- ===== 紹介ページ編集モーダル（管理者・編集者）。まだ入っていない人に見える文面 ===== -->
+<div class="modal-bg" id="about-modal">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:480px">
+    <h3>紹介ページを編集</h3>
+    <p class="sub" id="about-modal-room"></p>
+    <p class="sub" style="margin-top:-8px">この部屋に<b>まだ入っていない人</b>が左のメニューから開いたときに見える文面です。空欄の項目は表示されません。**はさむ** で太字、URLは自動でリンクになります。</p>
+    <label class="form-label">ひとこと（部屋名の下と、左メニューの部屋名の下に出ます）</label>
+    <input class="form-input" id="about-subtitle" placeholder="例：毎朝ひとつ、Dannaからレッスンが届きます。">
+    <label class="form-label">ここで何をするか</label>
+    <textarea class="form-input" id="about-what" rows="4" placeholder="例：21日間、毎朝ひとつ届くレッスンを読み、コメントを書きます。"></textarea>
+    <label class="form-label">入り方</label>
+    <textarea class="form-input" id="about-how" rows="3" placeholder="例：毎月22日から月末までが申込期間です。"></textarea>
+    <label class="form-label">募集の案内（任意。募集中の期がないときに出ます。空欄なら「いまは募集していません」）</label>
+    <textarea class="form-input" id="about-intake" rows="2" placeholder="例：次回は10月1日開始。9月22日から受付します。"></textarea>
+    <div style="display:flex;gap:10px">
+      <div style="flex:1"><label class="form-label">申込リンクURL（任意）</label><input class="form-input" id="about-cta-url" placeholder="https://…"></div>
+      <div style="width:140px;flex-shrink:0"><label class="form-label">ボタンの文字</label><input class="form-input" id="about-cta-label" placeholder="申し込む"></div>
+    </div>
+    <div style="margin-top:20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="primary-btn" id="about-save">保存する</button>
+      <button class="ghost-btn" id="about-preview" style="margin:0">👀 紹介ページを見る</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== 参加希望の受付モーダル（編集者以上） ===== -->
 <div class="modal-bg" id="sg-modal">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:420px">
@@ -808,7 +834,7 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
 <div id="toast"></div>
 
 <script src="vendor/supabase.js"></script>
-<script src="lessons.js?v=1"></script>
+<script src="lessons.js?v=3"></script>
 <script>
 /* ================= 設定 ================= */
 if (!window.supabase) { document.getElementById('boot').textContent = '読み込みに失敗しました。再読み込みしてください。'; throw new Error('supabase-js not loaded'); }
@@ -1368,6 +1394,7 @@ async function renderPinned(opts = {}){
   let h = editor ? `<div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
       ${bare ? '' : `<button class="add-res-btn" style="margin-bottom:0" id="edit-info">✏️ 基本情報を編集</button>`}
       <button class="add-res-btn" style="margin-bottom:0" id="add-sec">＋ セクションを追加</button>
+      ${bare ? '' : `<button class="add-res-btn" style="margin-bottom:0" id="edit-about" title="まだ入っていない人に見える紹介ページの文面">✏️ 紹介ページを編集</button>`}
     </div>` : '';
   // 「今日をつくる」のタブは、チャート・受付・セクションだけにする。
   // Zoom・コンタクト・スケジュール・カレンダーは、部屋の基本情報としては残るが、このタブには出さない。
@@ -1462,6 +1489,7 @@ async function renderPinned(opts = {}){
   $('page').innerHTML = h || `<div class="empty">${bare ? 'ご案内はまだありません' : t('基本情報はまだありません')}</div>`;
   bindCopyBoxes($('page'));
   const ei = $('edit-info'); if (ei) ei.onclick = openInfoModal;
+  const ea = $('edit-about'); if (ea) ea.onclick = () => openAboutModal(room);
   const as = $('add-sec'); if (as) as.onclick = () => openSecModal(null);
   const asg = $('add-signup'); if (asg) asg.onclick = () => openSignupModal(null);
   $('page').querySelectorAll('[data-sg-edit]').forEach(el => el.onclick = () =>
@@ -1573,6 +1601,41 @@ $('info-save').onclick = async () => {
     toast('基本情報を保存しました');
     repaintPinned();
   }
+};
+
+/* ===== 紹介ページ（まだ入っていない人に見える文面）の編集 =====
+   rooms.subtitle / about_what / about_how / next_intake / cta_url / cta_label を編集する。
+   表示側は lessons.js の openRoomAbout()。 */
+function openAboutModal(room){
+  room = room || S.current.room;
+  if (!room) return;
+  S.aboutRoom = room;
+  $('about-modal-room').textContent = room.name;
+  $('about-subtitle').value = room.subtitle || '';
+  $('about-what').value = room.about_what || '';
+  $('about-how').value = room.about_how || '';
+  $('about-intake').value = room.next_intake || '';
+  $('about-cta-url').value = room.cta_url || '';
+  $('about-cta-label').value = room.cta_label || '';
+  $('about-modal').style.display = 'flex';
+}
+$('about-modal').onclick = () => $('about-modal').style.display = 'none';
+$('about-preview').onclick = () => { $('about-modal').style.display = 'none'; openRoomAbout(S.aboutRoom); };
+$('about-save').onclick = async () => {
+  const room = S.aboutRoom; if (!room) return;
+  const v = id => $(id).value.trim() || null;
+  const patch = {
+    subtitle: v('about-subtitle'), about_what: v('about-what'), about_how: v('about-how'),
+    next_intake: v('about-intake'), cta_url: v('about-cta-url'), cta_label: v('about-cta-label'),
+  };
+  const { error } = await supa.from('rooms').update(patch).eq('id', room.id);
+  if (error) return toast('保存に失敗しました：' + error.message);
+  Object.assign(room, patch);
+  const r = S.rooms.find(x => x.id === room.id); if (r && r !== room) Object.assign(r, patch);
+  $('about-modal').style.display = 'none';
+  toast('紹介ページを保存しました');
+  renderNav();   // 左メニューの「ひとこと」も更新
+  if (S.current?.type === 'room-about' && S.current.room?.id === room.id) openRoomAbout(room);
 };
 
 /* ===== セクションの追加・編集 ===== */
