@@ -183,8 +183,37 @@ async function openRoomAbout(room){
     };
   }
 }
+/* 期の参加者（名前だけ）。RPC cohort_participants は本人が参加者/編集者のときだけ返す */
+const _peopleCache = {};
+async function cohortPeople(c, force){
+  if (!force && _peopleCache[c.id]) return _peopleCache[c.id];
+  const room = cohortRoom(c);
+  const [{ data: rows }, edIds] = await Promise.all([
+    supa.rpc('cohort_participants', { p_cohort: c.id }),
+    editorIdsFor(room?.id)
+  ]);
+  const all = rows || [];
+  const edSet = new Set(edIds);
+  let staff = all.filter(p => edSet.has(p.user_id));
+  const members = all.filter(p => !edSet.has(p.user_id));
+  // 編集者が cohort_members に居なければ profiles から名前を取る
+  const missing = edIds.filter(id => !staff.some(p => p.user_id === id));
+  if (missing.length) {
+    const { data: ps } = await supa.from('profiles').select('id, display_name').in('id', missing);
+    staff = staff.concat((ps || []).map(p => ({ user_id: p.id, display_name: p.display_name })));
+  }
+  const r = { members, staff };
+  _peopleCache[c.id] = r;
+  return r;
+}
+function peopleHTML(p){
+  const name = x => esc(x.display_name || '（名前未設定）');
+  return `<div style="display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px;line-height:1.7">${p.members.map(name).join('') ? p.members.map(x => `<span>${name(x)}</span>`).join('') : '<span class="muted">まだ参加者はいません</span>'}</div>
+    ${p.staff.length ? `<div class="muted" style="margin-top:10px;font-size:13px">運営：${p.staff.map(name).join('・')}</div>` : ''}`;
+}
+
 /* 期の説明ページ（1の階層）。上部バーの期名からいつでも戻れる */
-async function openCohortAbout(c){
+async function openCohortAbout(c, opts = {}){
   if (!c) return;
   const room = cohortRoom(c);
   leaveChat();
@@ -216,13 +245,23 @@ async function openCohortAbout(c){
       <h3><span class="bar"></span>お支払いのご案内<span class="muted" style="margin-left:auto;font-weight:400">お支払いの確認待ち</span></h3>
       ${c.payment_info ? `<div class="kv stack"><b>お支払い</b><span>${richText(c.payment_info)}</span></div>` : ''}
       ${c.payment_url ? `<a class="zoom-btn" href="${esc(c.payment_url)}" target="_blank" rel="noopener">${payLabel(c.payment_url)}</a>` : ''}
-    </div>` : ''}`;
+    </div>` : ''}
+    ${(cm || editor) ? `<div class="card" id="ca-people"><h3><span class="bar"></span>参加者<span class="muted" id="ca-people-n" style="margin-left:auto;font-weight:400"></span></h3><div id="ca-people-list" class="muted">読み込み中…</div></div>` : ''}`;
+  if (cm || editor) {
+    cohortPeople(c).then(p => {
+      const n = $('ca-people-n'), l = $('ca-people-list'); if (!n || !l) return;
+      n.textContent = `${p.members.length}人`;
+      l.className = ''; l.innerHTML = peopleHTML(p);
+      if (opts.scrollPeople) $('ca-people').scrollIntoView({ behavior:'smooth', block:'start' });
+    });
+  }
   const ch = $('ca-chat'); if (ch) ch.onclick = () => openCohortChat(c);
   const dy = $('ca-days'); if (dy) dy.onclick = () => openCohortDays(c);
   const ed = $('ca-edit'); if (ed) ed.onclick = () => openCohortModal(c, room);
   const jn = $('ca-join'); if (jn) jn.onclick = () => joinCohort(c.id, room);
 }
 async function joinCohort(cohortId, room){
+  delete _peopleCache[cohortId];
   const c = L.cohorts.find(x => x.id === cohortId);
   const { error } = await supa.from('cohort_members').insert({ cohort_id: cohortId, user_id: S.user.id });
   if (error) return toast('参加に失敗しました：' + error.message);
@@ -1233,12 +1272,30 @@ async function openCohortChat(c, opts = {}){
         ${unpaid ? `<div class="day-divider"><span style="color:var(--ai)">お支払いの確認待ち（案内は「レッスン一覧」に）</span></div>` : ''}
         ${html}
       </div>
+      ${(cm || editor) ? `<div id="chat-people" class="muted" style="font-size:12px;padding:6px 14px 0;cursor:pointer">参加者を見る ›</div>` : ''}
       <div class="reply-chip" id="reply-chip" style="display:none"></div>
       <div class="chat-input"><textarea id="chat-in" rows="1" placeholder="${canPost ? (editor ? 'ひとこと・返信を書く…' : '質問やコメントを書く…') : 'レッスンが届いたら書けます'}" ${canPost ? '' : 'disabled'}></textarea><button class="send" id="chat-send" ${canPost ? '' : 'disabled'}>↑</button></div>
     </div>
     <div class="lib-col" id="lib-col"></div>
   </div>`;
   drawDaysInto($('lib-col'), true);
+
+  // 参加者（入力欄の上の一行 ＋ 右カラムのカード）
+  if (cm || editor) {
+    const goPeople = () => openCohortAbout(c, { scrollPeople: true });
+    const cp = $('chat-people'); if (cp) cp.onclick = goPeople;
+    cohortPeople(c).then(p => {
+      const cp2 = $('chat-people'); if (cp2) cp2.textContent = `参加者 ${p.members.length}人 ›`;
+      const col = $('lib-col'); if (!col) return;
+      const card = document.createElement('div'); card.className = 'card';
+      const first = p.members.slice(0, 8);
+      card.innerHTML = `<h3><span class="bar"></span>参加者<span class="muted" style="margin-left:auto;font-weight:400">${p.members.length}人</span></h3>
+        <div style="font-size:13px;line-height:1.8">${first.map(x => esc(x.display_name || '（名前未設定）')).join('、')}${p.members.length > first.length ? ' …' : ''}</div>
+        <div class="muted" style="font-size:12px;margin-top:8px;cursor:pointer" id="lib-people-more">すべて見る ›</div>`;
+      col.appendChild(card);
+      $('lib-people-more').onclick = goPeople;
+    });
+  }
 
   // 画像のサムネ（署名URL）
   $('page').querySelectorAll('[data-img]').forEach(async el => { const u = await lessonImageUrl(el.dataset.img); if (u) el.style.backgroundImage = `url("${u}")`; else el.remove(); });
