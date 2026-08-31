@@ -807,13 +807,8 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
 <!-- ===== 名前設定モーダル ===== -->
 <div class="modal-bg" id="terms-modal">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:420px">
-    <h3>Creating Room へようこそ</h3>
-    <div class="terms-box">以下をご確認ください。<br>
-      <a href="https://robertfritzjapan.com/privacy-policy" target="_blank" rel="noopener">プライバシーポリシー</a><br>
-      <a href="https://robertfritzjapan.com/commercial-disclosure" target="_blank" rel="noopener">特定商取引法に基づく表記</a>
-    </div>
-    <label class="terms-check"><input type="checkbox" id="terms-check"><span>プライバシーポリシーと特定商取引法に基づく表記を確認しました</span></label>
-    <button class="primary-btn" id="terms-agree" disabled>同意してはじめる</button>
+    <div class="terms-box" style="margin-top:0"><a href="https://robertfritzjapan.com/privacy-policy" target="_blank" rel="noopener">プライバシーポリシー</a>と<a href="https://robertfritzjapan.com/commercial-disclosure" target="_blank" rel="noopener">特定商取引法に基づく表記</a>をご確認のうえ、お入りください。</div>
+    <button class="primary-btn" id="terms-agree">同意して入る</button>
   </div>
 </div>
 
@@ -2531,14 +2526,8 @@ $('lang-link').onclick = async e => {
 };
 
 /* ===== 利用前の同意（初回だけ。profiles.terms_agreed_at に記録） ===== */
-function openTermsModal(){
-  $('terms-check').checked = false;
-  $('terms-agree').disabled = true;
-  $('terms-modal').style.display = 'flex';
-}
-$('terms-check').onchange = () => { $('terms-agree').disabled = !$('terms-check').checked; };
+function openTermsModal(){ $('terms-modal').style.display = 'flex'; }
 $('terms-agree').onclick = async () => {
-  if (!$('terms-check').checked) return;
   const at = new Date().toISOString();
   const { error } = await supa.from('profiles').update({ terms_agreed_at: at }).eq('id', S.user.id);
   if (error) return toast('保存に失敗しました：' + error.message);
