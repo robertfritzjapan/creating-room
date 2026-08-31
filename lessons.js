@@ -1227,6 +1227,7 @@ async function openCohortChat(c, opts = {}){
   $('page').innerHTML = `<div class="chat-cols">
     <div class="chat-wrap" id="chat-wrap">
       <div class="chat-scroll" id="chat-scroll">
+        <div class="chat-rule">他の参加者がここに書いた個人的な内容はこの場の外に持ち出さないようお願いします。</div>
         ${c.intro && !published.length ? `<div class="ch-intro" style="font-size:14.5px">${richText(c.intro)}</div>` : ''}
         ${startNote ? `<div class="day-divider"><span>${esc(startNote)}</span></div>` : ''}
         ${unpaid ? `<div class="day-divider"><span style="color:var(--ai)">お支払いの確認待ち（案内は「レッスン一覧」に）</span></div>` : ''}

@@ -269,6 +269,16 @@ a{color:var(--ai)}
 .email-row input:focus{border-color:var(--ai)}
 .email-row button{background:var(--ai);color:#fff;border:none;border-radius:8px;padding:0 18px;font-size:13px;cursor:pointer;white-space:nowrap}
 .login-note{font-size:11px;color:var(--gray);margin-top:16px}
+.login-links{font-size:11px;color:var(--gray);margin-top:14px}
+.login-links a{color:var(--gray);text-decoration:underline;margin:0 6px}
+.side-links{padding:8px 24px 0;font-size:10.5px;color:#77777d;line-height:1.8}
+.side-links a{color:#77777d;text-decoration:none}
+.side-links a:hover{color:#c9c9cf;text-decoration:underline}
+.chat-rule{font-size:12px;color:var(--gray);text-align:center;padding:10px 12px 14px;border-bottom:1px dashed var(--line);margin-bottom:8px;line-height:1.6}
+.terms-box{font-size:14px;line-height:1.8;margin:14px 0}
+.terms-box a{color:var(--ai);text-decoration:underline}
+.terms-check{display:flex;align-items:flex-start;gap:10px;font-size:14px;line-height:1.6;margin:14px 0 18px;cursor:pointer}
+.terms-check input{margin-top:5px;width:18px;height:18px;flex-shrink:0}
 #magic-sent{display:none;background:var(--ai-soft);color:var(--ai);border-radius:8px;padding:10px 14px;font-size:12.5px;margin-top:14px}
 
 /* ===== Modal ===== */
@@ -550,6 +560,7 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
       <button id="otp-btn">ログイン</button>
     </div>
     <p class="login-note">メールの方はパスワード不要。届いたリンクをタップするだけでログインできます。<br>Facebookアカウントは不要です。</p>
+    <p class="login-links"><a href="https://robertfritzjapan.com/privacy-policy" target="_blank" rel="noopener">プライバシーポリシー</a>｜<a href="https://robertfritzjapan.com/commercial-disclosure" target="_blank" rel="noopener">特定商取引法に基づく表記</a></p>
   </div>
 </div>
 
@@ -560,6 +571,7 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
     <div class="logo"><b>Creating</b> Room<small>ROBERT FRITZ CONSULTING</small></div>
     <div id="nav"></div>
     <div class="logout" id="logout-btn">ログアウト</div>
+    <div class="side-links"><a href="https://robertfritzjapan.com/privacy-policy" target="_blank" rel="noopener">プライバシーポリシー</a> ・ <a href="https://robertfritzjapan.com/commercial-disclosure" target="_blank" rel="noopener">特定商取引法に基づく表記</a></div>
     <div class="me" id="me-btn">
       <div class="avatar" id="me-avatar">?</div>
       <div><span id="me-name">…</span><br><span style="font-size:10.5px;color:#8f8f96" id="me-sub">権限を見る</span></div>
@@ -792,6 +804,18 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
 </div>
 
 <!-- ===== 名前設定モーダル ===== -->
+<div class="modal-bg" id="terms-modal">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:420px">
+    <h3>はじめに、ひとつだけ</h3>
+    <div class="terms-box">Creating Room をお使いいただく前に、以下をご確認ください。<br>
+      <a href="https://robertfritzjapan.com/privacy-policy" target="_blank" rel="noopener">プライバシーポリシー</a><br>
+      <a href="https://robertfritzjapan.com/commercial-disclosure" target="_blank" rel="noopener">特定商取引法に基づく表記</a>
+    </div>
+    <label class="terms-check"><input type="checkbox" id="terms-check"><span>プライバシーポリシーと特定商取引法に基づく表記を確認しました</span></label>
+    <button class="primary-btn" id="terms-agree" disabled>同意してはじめる</button>
+  </div>
+</div>
+
 <div class="modal-bg" id="name-modal">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:380px">
     <h3>なんとお呼びしましょう</h3>
@@ -980,7 +1004,8 @@ async function start(){
       openRoom(S.rooms.find(x => isMember(x.id) && !isEntranceRoom(x) && !isNoteRoom(x)));  // 道の案内・ノート以外で入っている部屋のうち一番上（FBS だけの人は FBS へ）
     else if (S.memberships.length) openRoom(S.rooms.find(x => isMember(x.id)));   // はじめかただけの人（新しい人）は、はじめかたへ
     else openHome();
-    if (S.firstVisit) openNameModal();
+    if (!S.profile.terms_agreed_at) openTermsModal();
+    else if (S.firstVisit) openNameModal();
   } catch (e) {
     console.error(e);
     toast('データの読み込みに失敗しました。ページを再読み込みしてください。');
@@ -2502,6 +2527,23 @@ $('lang-link').onclick = async e => {
   const { error } = await supa.from('profiles').update({ lang: next }).eq('id', S.user.id);
   if (error) return toast('保存に失敗しました：' + error.message);
   location.reload();
+};
+
+/* ===== 利用前の同意（初回だけ。profiles.terms_agreed_at に記録） ===== */
+function openTermsModal(){
+  $('terms-check').checked = false;
+  $('terms-agree').disabled = true;
+  $('terms-modal').style.display = 'flex';
+}
+$('terms-check').onchange = () => { $('terms-agree').disabled = !$('terms-check').checked; };
+$('terms-agree').onclick = async () => {
+  if (!$('terms-check').checked) return;
+  const at = new Date().toISOString();
+  const { error } = await supa.from('profiles').update({ terms_agreed_at: at }).eq('id', S.user.id);
+  if (error) return toast('保存に失敗しました：' + error.message);
+  S.profile.terms_agreed_at = at;
+  $('terms-modal').style.display = 'none';
+  if (S.firstVisit) openNameModal();
 };
 
 /* ===== 表示名 ===== */
