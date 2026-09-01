@@ -1291,13 +1291,15 @@ async function openCohortChat(c, opts = {}){
   $('page').innerHTML = `<div class="chat-cols">
     <div class="chat-wrap" id="chat-wrap">
       <div class="chat-scroll" id="chat-scroll">
-        <div class="chat-rule">他の参加者がここに書いた個人的な内容はこの場の外に持ち出さないようお願いします。</div>
         ${c.intro && !published.length ? `<div class="ch-intro" style="font-size:14.5px">${richText(c.intro)}</div>` : ''}
         ${startNote ? `<div class="day-divider"><span>${esc(startNote)}</span></div>` : ''}
         ${unpaid ? `<div class="day-divider"><span style="color:var(--ai)">お支払いの確認待ち（案内は「レッスン一覧」に）</span></div>` : ''}
         ${html}
       </div>
-      ${(cm || editor) ? `<div id="chat-people" class="muted" style="font-size:12px;padding:6px 14px 0;cursor:pointer">参加者を見る ›</div>` : ''}
+      <div class="muted" style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:11.5px;padding:6px 14px 0;line-height:1.5">
+        <span>他の参加者がここに書いた個人的な内容は、この場の外に持ち出さないようお願いします。</span>
+        ${(cm || editor) ? `<span id="chat-people" style="white-space:nowrap;cursor:pointer">参加者を見る ›</span>` : ''}
+      </div>
       <div class="reply-chip" id="reply-chip" style="display:none"></div>
       <div class="chat-input"><textarea id="chat-in" rows="1" placeholder="${canPost ? (editor ? 'ひとこと・返信を書く…' : '質問やコメントを書く…') : 'レッスンが届いたら書けます'}" ${canPost ? '' : 'disabled'}></textarea><button class="send" id="chat-send" ${canPost ? '' : 'disabled'}>↑</button></div>
     </div>
