@@ -1238,10 +1238,15 @@ async function openCohortChat(c, opts = {}){
     if (r === x) { roots.push(x); threads[x.id] = threads[x.id] || []; }
     else (threads[r.id] = threads[r.id] || []).push(x);
   });
-  const items = [
-    ...published.map(l => ({ t: l.publish_at, kind:'lesson', l })),
-    ...roots.map(x => ({ t: x.created_at, kind:'comment', x, replies: threads[x.id] })),
-  ].sort((a,b) => a.t.localeCompare(b.t));
+  // Day ごとにまとめる：各レッスンの吹き出しの下に、その Day のコメント束を時間順で
+  const items = [];
+  const rootByLesson = {};
+  roots.forEach(x => (rootByLesson[x.lesson_id] = rootByLesson[x.lesson_id] || []).push(x));
+  published.forEach(l => {
+    items.push({ t: l.publish_at, kind:'lesson', l });
+    (rootByLesson[l.id] || []).sort((a,b) => a.created_at.localeCompare(b.created_at))
+      .forEach(x => items.push({ t: x.created_at, kind:'comment', x, replies: threads[x.id] }));
+  });
 
   let firstNew = null;
   const newMarkFor = (t, x) => {
