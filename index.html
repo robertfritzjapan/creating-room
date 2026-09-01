@@ -270,6 +270,9 @@ a{color:var(--ai)}
 .email-row button{background:var(--ai);color:#fff;border:none;border-radius:8px;padding:0 18px;font-size:13px;cursor:pointer;white-space:nowrap}
 .login-note{font-size:11px;color:var(--gray);margin-top:16px}
 .login-links{font-size:11px;color:var(--gray);margin-top:14px}
+.login-consent{display:flex;align-items:flex-start;justify-content:center;gap:8px;font-size:12px;color:var(--gray);margin-top:18px;line-height:1.7;cursor:pointer;text-align:left}
+.login-consent input{margin-top:4px;width:16px;height:16px;flex-shrink:0}
+.login-consent a{color:var(--gray);text-decoration:underline}
 .login-links a{color:var(--gray);text-decoration:underline;margin:0 6px}
 .side-links{padding:8px 24px 0;font-size:10.5px;color:#77777d;line-height:1.8}
 .side-links a{color:#77777d;text-decoration:none}
@@ -548,7 +551,7 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
     <p class="sub">Creating をはじめよう。</p>
     <button class="gbtn" id="google-btn">
       <svg width="17" height="17" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.8 6.1C12.3 13.4 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/><path fill="#FBBC05" d="M10.4 28.7c-.5-1.5-.8-3-.8-4.7s.3-3.2.8-4.7l-7.8-6.1C.9 16.5 0 20.1 0 24s.9 7.5 2.6 10.8l7.8-6.1z"/><path fill="#34A853" d="M24 48c6.2 0 11.6-2 15.4-3.6 0 0-7.5-5.8-7.5-5.8-2.1 1.4-4.8 2.3-7.9 2.3-6.3 0-11.7-3.9-13.6-9.3l-7.8 6.1C6.5 42.6 14.6 48 24 48z"/></svg>
-      Google でログイン
+      Google で入室する
     </button>
     <div class="or">または</div>
     <div class="email-row">
@@ -558,10 +561,10 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
     <div id="magic-sent">メールを送りました。届いたメールに書いてある<b>コード（数字）</b>を下に入力してください（メール内のリンクをタップしてもログインできます）。</div>
     <div class="email-row" id="otp-row" style="display:none;margin-top:10px">
       <input inputmode="numeric" pattern="[0-9]*" maxlength="10" id="otp-code" placeholder="メールに届いたコード" autocomplete="one-time-code">
-      <button id="otp-btn">ログイン</button>
+      <button id="otp-btn">入室する</button>
     </div>
     <p class="login-note">メールの方はパスワード不要。届いたリンクをタップするだけでログインできます。<br>Facebookアカウントは不要です。</p>
-    <p class="login-links"><a href="https://robertfritzjapan.com/privacy-policy" target="_blank" rel="noopener">プライバシーポリシー</a>｜<a href="https://robertfritzjapan.com/commercial-disclosure" target="_blank" rel="noopener">特定商取引法に基づく表記</a></p>
+    <label class="login-consent"><input type="checkbox" id="login-consent"><span>※ <a href="https://robertfritzjapan.com/privacy-policy" target="_blank" rel="noopener">プライバシーポリシー</a>と<a href="https://robertfritzjapan.com/commercial-disclosure" target="_blank" rel="noopener">特定商取引法に基づく表記</a>に同意します</span></label>
   </div>
 </div>
 
@@ -927,13 +930,21 @@ const vT = (v, k) => (isEN() && v[k + '_en']) ? v[k + '_en'] : v[k];   // 動画
 const initialOf = name => (name||'?').trim().slice(0,1).toUpperCase();
 
 /* ================= 認証 ================= */
+const TERMS_KEY = 'cr_terms_pre';   // 入室前に同意した印（ログイン後に profiles へ記録する）
+function consentOk(){
+  if ($('login-consent').checked) { try { localStorage.setItem(TERMS_KEY, '1'); } catch(_){} return true; }
+  toast('プライバシーポリシーと特定商取引法に基づく表記への同意にチェックを入れてください');
+  return false;
+}
 $('google-btn').onclick = async () => {
+  if (!consentOk()) return;
   const { error } = await supa.auth.signInWithOAuth({ provider:'google', options:{ redirectTo: APP_URL } });
   if (error) toast('ログインに失敗しました：' + error.message);
 };
 $('magic-btn').onclick = async () => {
   const email = $('magic-email').value.trim();
   if (!email) return toast('メールアドレスを入力してください');
+  if (!consentOk()) return;
   $('magic-btn').disabled = true;
   const { error } = await supa.auth.signInWithOtp({ email, options:{ emailRedirectTo: APP_URL } });
   $('magic-btn').disabled = false;
@@ -1000,7 +1011,15 @@ async function start(){
       openRoom(S.rooms.find(x => isMember(x.id) && !isEntranceRoom(x) && !isNoteRoom(x)));  // 道の案内・ノート以外で入っている部屋のうち一番上（FBS だけの人は FBS へ）
     else if (S.memberships.length) openRoom(S.rooms.find(x => isMember(x.id)));   // はじめかただけの人（新しい人）は、はじめかたへ
     else openHome();
-    if (!S.profile.terms_agreed_at) openTermsModal();
+    if (!S.profile.terms_agreed_at) {
+      let pre = false; try { pre = localStorage.getItem(TERMS_KEY) === '1'; } catch(_){}
+      if (pre) {
+        const at = new Date().toISOString();
+        const { error } = await supa.from('profiles').update({ terms_agreed_at: at }).eq('id', S.user.id);
+        if (!error) { S.profile.terms_agreed_at = at; try { localStorage.removeItem(TERMS_KEY); } catch(_){} if (S.firstVisit) openNameModal(); }
+        else openTermsModal();
+      } else openTermsModal();
+    }
     else if (S.firstVisit) openNameModal();
   } catch (e) {
     console.error(e);
