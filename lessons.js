@@ -1229,15 +1229,40 @@ async function openCohortChat(c, opts = {}){
   const lastSeen = lastSeenOf(c.id);
   const cm = myCMFor(c.id);
 
+  // スレッド化：返信は元コメントの直下にぶら下げる（返信の返信も同じ束に時間順）
+  const rootOf = x => { let cur = x, guard = 0; while (cur.parent_id && byId[cur.parent_id] && guard++ < 50) cur = byId[cur.parent_id]; return cur; };
+  const threads = {};   // root id -> replies[]
+  const roots = [];
+  comments.forEach(x => {
+    const r = rootOf(x);
+    if (r === x) { roots.push(x); threads[x.id] = threads[x.id] || []; }
+    else (threads[r.id] = threads[r.id] || []).push(x);
+  });
   const items = [
     ...published.map(l => ({ t: l.publish_at, kind:'lesson', l })),
-    ...comments.map(x => ({ t: x.created_at, kind:'comment', x })),
+    ...roots.map(x => ({ t: x.created_at, kind:'comment', x, replies: threads[x.id] })),
   ].sort((a,b) => a.t.localeCompare(b.t));
 
   let firstNew = null;
+  const newMarkFor = (t, x) => {
+    const isNew = t > lastSeen && !(x && x.user_id === S.user.id);
+    return isNew && !firstNew ? (firstNew = true, `<div class="day-divider" id="first-new"><span style="color:var(--ai)">ここから新しい</span></div>`) : '';
+  };
+  const renderComment = (x, root) => {
+    const mine = x.user_id === S.user.id, isEd = editors.includes(x.user_id);
+    const parent = x.parent_id ? byId[x.parent_id] : null;
+    const showQuote = parent && root && parent.id !== root.id;   // 束の中で、元コメント以外への返信だけ引用を出す
+    return newMarkFor(x.created_at, x) + `<div class="msg ${mine ? 'mine' : ''}" id="c-${x.id}"${root ? ' style="margin-bottom:12px"' : ''}>
+      <div class="avatar cav ${isEd ? 'cav-ed' : ''}"${root ? ' style="width:26px;height:26px;font-size:11px"' : ''}>${esc(initialOf(S.profilesCache[x.user_id]))}</div>
+      <div class="msg-body">
+        <div class="msg-head"><b>${esc(S.profilesCache[x.user_id] || '…')}</b>${isEd ? '<span class="cwho-ed" style="margin-left:6px">担当</span>' : ''}<span>${fmtWhen(x.created_at)}</span></div>
+        ${showQuote ? `<div class="msg-quote">↩ ${esc(S.profilesCache[parent.user_id] || '')}：${esc(plainText(parent.body).slice(0, 50))}</div>` : ''}
+        <div class="msg-text">${esc(x.body)}</div>
+        <div class="msg-tools"><button data-reply="${(root || x).id}" data-reply-name="${esc(S.profilesCache[x.user_id] || '')}">↩ 返信</button>${(mine || editor) ? `<button data-del="${x.id}">削除</button>` : ''}</div>
+      </div></div>`;
+  };
   const html = items.map(it => {
-    const isNew = it.t > lastSeen && !(it.kind === 'comment' && it.x.user_id === S.user.id);
-    const newMark = isNew && !firstNew ? (firstNew = it, `<div class="day-divider" id="first-new"><span style="color:var(--ai)">ここから新しい</span></div>`) : '';
+    const newMark = it.kind === 'lesson' ? newMarkFor(it.t, null) : '';
     if (it.kind === 'lesson') {
       const l = it.l, ex = plainText(l.body);
       return newMark + `<div class="msg msg-lesson" data-open-lesson="${l.id}">
@@ -1247,16 +1272,11 @@ async function openCohortChat(c, opts = {}){
           <div class="lesson-bubble">${l.image_path ? `<div class="lb-img" data-img="${esc(l.image_path)}"></div>` : ''}<div class="lb-text">${esc(ex.slice(0, CHAT_EXCERPT))}${ex.length > CHAT_EXCERPT ? '…' : ''}</div><div class="lb-more">全文を読む →</div></div>
         </div></div>`;
     }
-    const x = it.x, mine = x.user_id === S.user.id, isEd = editors.includes(x.user_id);
-    const parent = x.parent_id ? byId[x.parent_id] : null;
-    return newMark + `<div class="msg ${mine ? 'mine' : ''}" id="c-${x.id}">
-      <div class="avatar cav ${isEd ? 'cav-ed' : ''}">${esc(initialOf(S.profilesCache[x.user_id]))}</div>
-      <div class="msg-body">
-        <div class="msg-head"><b>${esc(S.profilesCache[x.user_id] || '…')}</b>${isEd ? '<span class="cwho-ed" style="margin-left:6px">担当</span>' : ''}<span>${fmtWhen(x.created_at)}</span></div>
-        ${parent ? `<div class="msg-quote">↩ ${esc(S.profilesCache[parent.user_id] || '')}：${esc(plainText(parent.body).slice(0, 50))}</div>` : ''}
-        <div class="msg-text">${esc(x.body)}</div>
-        <div class="msg-tools"><button data-reply="${x.parent_id || x.id}" data-reply-name="${esc(S.profilesCache[x.user_id] || '')}">↩ 返信</button>${(mine || editor) ? `<button data-del="${x.id}">削除</button>` : ''}</div>
-      </div></div>`;
+    const x = it.x;
+    const replies = (it.replies || []).sort((a,b) => a.created_at.localeCompare(b.created_at));
+    return renderComment(x, null) + (replies.length
+      ? `<div class="thread" style="margin:-8px 0 18px 44px;padding-left:12px;border-left:2px solid #e6e2de">${replies.map(r => renderComment(r, x)).join('')}</div>`
+      : '');
   }).join('');
 
   const latest = published[published.length - 1];
