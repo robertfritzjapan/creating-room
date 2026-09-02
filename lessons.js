@@ -131,10 +131,17 @@ async function openRoomAbout(room){
       <button class="add-res-btn" style="margin:0" id="about-edit">✏️ 紹介ページを編集</button>
       <button class="ghost-btn" style="margin:0" id="about-back">部屋に戻る</button>
     </div>` : '';
+  // 「ここで何をするか」の1行目が写真の URL なら、部屋名の上に大きく出す（文面の中には出さない）
+  let what = room.about_what || '', hero = '';
+  const m = what.match(/^\s*(https?:\/\/\S+)\s*\n?/);
+  if (m && (/\.(png|jpe?g|gif|webp)(\?|#|$)/i.test(m[1]) || m[1].includes('/room-media/'))) {
+    hero = m[1]; what = what.slice(m[0].length).replace(/^\n+/, '');
+  }
   h += `<div class="card about-card">
+    ${hero ? `<img class="about-hero" src="${esc(hero)}" alt="" loading="lazy">` : ''}
     <h2 class="about-title">${esc(room.name)}</h2>
     ${room.subtitle ? `<p class="about-sub">${esc(room.subtitle)}</p>` : ''}
-    ${room.about_what ? `<div class="about-kv"><div class="k">ここで何をするか</div><div class="v">${richText(room.about_what)}</div></div>` : ''}
+    ${what ? `<div class="about-kv"><div class="k">ここで何をするか</div><div class="v">${richText(what)}</div></div>` : ''}
     ${room.about_how  ? `<div class="about-kv"><div class="k">入り方</div><div class="v">${richText(room.about_how)}</div></div>` : ''}
     ${!room.about_what && !room.about_how ? `<p class="muted">紹介文は準備中です。</p>` : ''}
   </div>`;
