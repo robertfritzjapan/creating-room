@@ -146,7 +146,7 @@ async function openRoomAbout(room){
     ${!room.about_what && !room.about_how ? `<p class="muted">紹介文は準備中です。</p>` : ''}
   </div>`;
   if (vis === 'public') {
-    h += `<div class="card"><p style="font-size:13px;margin-bottom:12px">どなたでも入れます。</p><button class="primary-btn" id="about-join">参加する</button></div>`;
+    h += `<div class="card"><p style="font-size:16px;margin-bottom:12px">どなたでも入れます。</p><button class="primary-btn" id="about-join">参加する</button></div>`;
   } else if (openC.length) {
     h += openC.map(c => `
       <div class="card">
@@ -165,7 +165,7 @@ async function openRoomAbout(room){
   h += `<div class="card">
       <div class="${room.next_intake ? 'about-intake' : 'nocta'}">${room.next_intake ? richText(room.next_intake) : 'いまは募集していません'}</div>
     ${room.cta_url
-      ? `<a class="primary-btn" href="${esc(room.cta_url)}" target="_blank" rel="noopener">${esc(room.cta_label || '申し込む')}</a>`
+      ? `<a class="primary-btn" href="${esc(room.cta_url)}" target="_blank" rel="noopener">${esc(room.cta_label || '詳細を見る')}</a>`
          : room.next_intake ? '' : `<button class="ghost-btn" id="about-notify">募集が始まったら知らせる</button>`}
   </div>`;
 }
