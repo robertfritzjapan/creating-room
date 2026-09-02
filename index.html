@@ -179,7 +179,7 @@ a{color:var(--ai)}
 .sg-head .res-del{margin-left:auto;flex-shrink:0}
 .sg-date{font-size:14px;color:var(--gray);white-space:nowrap}
 .sg-date b{font-weight:700;color:var(--ink);font-size:15px}
-.sg-note{font-size:16.5px;line-height:1.85;margin-top:4px;white-space:pre-wrap;color:var(--ink)}
+.sg-note{font-size:16.5px;line-height:1.85;margin-top:4px;color:var(--ink)}
 .sg-status{font-size:15px;margin-top:8px}
 .sg-btn{margin:10px 0 0}
 .sg-btn.on{background:#e8efe4;border-color:#4d7a5e;color:#40684f}
@@ -687,7 +687,7 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
       </div>
     </div>
     <label class="form-label">補足（任意）</label>
-    <textarea class="form-input" id="sg-note" rows="3" placeholder="例：時間・場所の候補、締切など"></textarea>
+    <textarea class="form-input" id="sg-note" rows="5" placeholder="例：時間・場所の候補、締切など。**はさむ** で太字、URLは自動でリンクになります"></textarea>
     <div style="margin-top:20px"><button class="primary-btn" id="sg-save">受付を開始する</button></div>
   </div>
 </div>
@@ -1504,7 +1504,7 @@ async function renderPinned(opts = {}){
         return `<div class="sg-item">
           <div class="sg-head"><b>${esc(s.title)}</b>${s.event_date || s.event_time
             ? `<span class="sg-date">${s.event_date ? fmtDay(s.event_date) : ''}${s.event_time ? ` <b>${esc(String(s.event_time).slice(0, 5))}</b>〜` : ''}</span>` : ''}${editor ? `<button class="res-del" data-sg-edit="${s.id}" title="日時や文言を直す">✏️</button><button class="res-del" data-sg-del="${s.id}" title="受付を終了して削除">✕</button>` : ''}</div>
-          ${s.note ? `<div class="sg-note">${esc(s.note)}</div>` : ''}
+          ${s.note ? `<div class="sg-note">${richText(s.note)}</div>` : ''}
           <div class="sg-status">現在 <b>${rs.length}</b> 人が参加希望${rs.length ? `：${rs.map(r => esc(S.profilesCache[r.user_id] || '…')).join('、')}` : ''}</div>
           <button class="add-res-btn sg-btn ${mine ? 'on' : ''}" data-sg-join="${s.id}" data-mine="${mine ? '1' : ''}">${mine ? '✓ 参加希望済み（タップで取り消し）' : '🙋 参加したい'}</button>
         </div>`;
@@ -1515,10 +1515,10 @@ async function renderPinned(opts = {}){
   if (!fold && !bare && p.schedule?.length) {
     h += `<div class="card"><h3><span class="bar"></span>${esc(p.schedule_title || 'スケジュール')}</h3>
       <ul class="sched">${p.schedule.map(s => `<li>${esc(s)}</li>`).join('')}</ul>
-      ${p.note ? `<p class="muted" style="margin-top:10px">${esc(p.note)}</p>` : ''}
+      ${p.note ? `<p class="muted" style="margin-top:10px">${richText(p.note)}</p>` : ''}
     </div>`;
   } else if (!fold && !bare && p.note) {
-    h += `<div class="card"><p style="font-size:16px;line-height:1.85">${esc(p.note)}</p></div>`;
+    h += `<div class="card"><p style="font-size:16px;line-height:1.85">${richText(p.note)}</p></div>`;
   }
   const gcalIds = (fold || bare) ? [] : (Array.isArray(p.gcal) ? p.gcal : [p.gcal]).filter(Boolean);
   if (gcalIds.length) {
