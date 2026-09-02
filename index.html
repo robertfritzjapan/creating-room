@@ -1163,7 +1163,7 @@ function openRoom(room){
   // 質問は「なんでも窓口」に一本化した。回ごとに質問が要る 21 Lessons だけ、部屋の中に残す。
   const showChat = room.slug === 'lessons21';
   const tabs = room.slug === 'fst'   // FSTの部屋：ツール置き場＋学びの機会の拠点
-    ? [['pinned','基本情報'],['resources','RFC提供ツール'],['tools','みんなのツール'],['session','学びの機会']]
+    ? [['pinned','基本情報'],['resources','RFC提供ツール'],['tools','みんなのツール']]
     : isEntranceRoom(room)
     ? [['pinned','基本情報'],['session','体験セッション'],['resources','リソース']]
     : isNoteRoom(room)
