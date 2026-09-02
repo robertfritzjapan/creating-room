@@ -913,7 +913,7 @@ const EN = {
   '参加者・支払い確認':'Participants','権限':'Roles',
   '📔 はじめかた':'📔 Getting started','はじめかた':'Getting started',
   '構造コンサルタント認定（SCCP）':'SCCP – Structural Consultant Certification','フリッツ・ビジネススクール':'Fritz Business School',
-  '創り出す思考（FST）':'FST – Fundamentals of Structural Thinking','創造プロセス倶楽部':'Creative Process Club','読書会':'Book Club',
+  'FST修了者':'FST Alumni','創造プロセス倶楽部':'Creative Process Club','読書会':'Book Club',
   'すべて':'All','＋ クラス回を追加':'+ Add a class','🔍 概要・アサインメントで検索…':'🔍 Search description / assignment…',
   '動画を開く':'Open video','▶ 動画を開く':'▶ Open video','アサインメント':'Assignment','🔑 動画パスワード':'🔑 Video password','コピー':'Copy',
   'タップでコピー':'Tap to copy','パスワードをコピーしました':'Password copied','該当する動画がありません':'No videos found','編集':'Edit','削除':'Delete',
@@ -1054,40 +1054,49 @@ function renderMe(){
   $('me-sub').textContent = top + ' · ' + t('権限を見る');
   $('logout-btn').textContent = t('ログアウト');
 }
-/* サイドバーは「Wayのクラス／みんなとつくる／ワークショップ」の3グループ。
-   Creating Wayをはじめる（entrance）と Creating ノート（道具）は、グループより上に単独で出す。
+/* サイドバーは「Creating Way／21 Lessons（単独）／みんなとつくる／ワークショップ」。
+   Creating Way グループ＝Creating Wayをはじめる・Creating ノート・Wayのクラスの部屋（nav_group='class'）。
+   21 Lessons はグループ見出しなしで「みんなとつくる」の上に単独で出す。
    入れない部屋もグレーで見せる（押すと紹介ページ）。募集中の期がある部屋にはバッジ。 */
-const NAV_GROUPS = [['class','Wayのクラス'],['together','みんなとつくる'],['workshop','ワークショップ']];
-const NAV_KEYS = NAV_GROUPS.map(g => g[0]);
+const NAV_GROUPS = [['together','みんなとつくる'],['workshop','ワークショップ']];
+const NAV_KEYS = ['class','together','workshop'];
 const isNoteRoom = r => !!r && r.kind === 'tool';                                     // Creating ノート（緊張構造チャートの部屋）
 const isEntranceRoom = r => !!r && r.slug === 'entrance';                             // Creating Wayをはじめる
 /* nav_group が新しい値でない部屋は「みんなとつくる」に置く（データ移行が済むまでの受け皿）。
-   'hidden' の部屋（創造プロセス倶楽部など）はメニューに出さないが、データは残る。 */
+   'hidden' の部屋はメニューに出さないが、データは残る。 */
 const navGroupOf = r => (isNoteRoom(r) || isEntranceRoom(r)) ? 'hidden'
   : r.nav_group === 'hidden' ? 'hidden'
   : NAV_KEYS.includes(r.nav_group) ? r.nav_group : 'together';
 function renderNav(){
   const entrance = S.rooms.find(r => isEntranceRoom(r) && isMember(r.id));
   const note = S.rooms.find(r => isNoteRoom(r) && isMember(r.id));
+  const roomRow = r => {
+    const member = isMember(r.id);
+    const open = !member && L.cohorts.some(c => c.room_id === r.id && c.status === 'open');
+    const unread = (isLessonsRoom(r) && canEdit(r.id) && L.queueCount) ? `<span class="nav-badge" data-queue-badge title="${t('未返信')}">${L.queueCount}</span>` : '';
+    const badge = unread || (open ? `<span class="nav-tag">${t('募集中')}</span>`
+      : (!member && r.visibility === 'public') ? `<button class="join-mini" data-join="${r.id}">${t('参加')}</button>` : '');
+    return `<div class="nav-item ${member ? '' : 'locked'}" data-nav="${r.id}"><span class="dot"></span><span class="nav-name">${esc(t(r.name))}${r.subtitle && !member ? `<span class="nav-sub">${esc(r.subtitle)}</span>` : ''}</span>${badge}</div>`;
+  };
   let h = `<div class="nav-label">${t('ホーム')}</div>
     <div class="nav-item" data-nav="home"><span class="dot"></span>${t('新着フィード')}</div>`;
   if (entrance) h += `<div class="nav-item" data-nav="inbox"><span class="dot"></span>${t('なんでも窓口')}</div>`;
   h += `<div class="nav-item" data-nav="pins"><span class="dot"></span>${t('ピンした場所')}</div>`;
-  // 道そのもの。カテゴリの見出しを付けず、ホームのすぐ下に置く
-  if (entrance || note) h += `<div style="height:12px"></div>`;
-  if (entrance) h += `<div class="nav-item" data-nav="${entrance.id}"><span class="dot"></span>${esc(t(entrance.name))}</div>`;
-  if (note) h += `<div class="nav-item" data-nav="${note.id}"><span class="dot"></span>${esc(t(note.name))}</div>`;
+  // Creating Way グループ：はじめる・ノート・Wayのクラスの部屋をひとまとめ
+  const wayRooms = S.rooms.filter(r => navGroupOf(r) === 'class');
+  if (entrance || note || wayRooms.length){
+    h += `<div class="nav-label">Creating Way</div>`;
+    if (entrance) h += `<div class="nav-item" data-nav="${entrance.id}"><span class="dot"></span>${esc(t(entrance.name))}</div>`;
+    if (note) h += `<div class="nav-item" data-nav="${note.id}"><span class="dot"></span>${esc(t(note.name))}</div>`;
+    h += wayRooms.map(roomRow).join('');
+  }
+  // 21 Lessons：グループ見出しなしで単独表示（「みんなとつくる」の上）
+  const lessonsRooms = S.rooms.filter(r => navGroupOf(r) !== 'hidden' && isLessonsRoom(r));
+  if (lessonsRooms.length) h += `<div style="height:12px"></div>` + lessonsRooms.map(roomRow).join('');
   NAV_GROUPS.forEach(([key, label]) => {
-    const rooms = S.rooms.filter(r => navGroupOf(r) === key);
+    const rooms = S.rooms.filter(r => navGroupOf(r) === key && !isLessonsRoom(r));
     if (!rooms.length) return;
-    h += `<div class="nav-label">${t(label)}</div>` + rooms.map(r => {
-      const member = isMember(r.id);
-      const open = !member && L.cohorts.some(c => c.room_id === r.id && c.status === 'open');
-      const unread = (isLessonsRoom(r) && canEdit(r.id) && L.queueCount) ? `<span class="nav-badge" data-queue-badge title="${t('未返信')}">${L.queueCount}</span>` : '';
-      const badge = unread || (open ? `<span class="nav-tag">${t('募集中')}</span>`
-        : (!member && r.visibility === 'public') ? `<button class="join-mini" data-join="${r.id}">${t('参加')}</button>` : '');
-      return `<div class="nav-item ${member ? '' : 'locked'}" data-nav="${r.id}"><span class="dot"></span><span class="nav-name">${esc(t(r.name))}${r.subtitle && !member ? `<span class="nav-sub">${esc(r.subtitle)}</span>` : ''}</span>${badge}</div>`;
-    }).join('');
+    h += `<div class="nav-label">${t(label)}</div>` + rooms.map(roomRow).join('');
   });
   $('nav').innerHTML = h;
   $('nav').querySelectorAll('[data-nav]').forEach(el => el.onclick = () => {
