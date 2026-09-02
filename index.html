@@ -504,6 +504,8 @@ a{color:var(--ai)}
 /* はじめかたの Creatingノート タブ：カードは「見出し＋1行」まで。残りは「くわしく」の中 */
 .sec-card h3{margin-bottom:7px}
 .sec-lead{font-size:16px;line-height:1.9}
+.file-chip{display:inline-flex;align-items:center;gap:6px;margin:6px 0;padding:9px 16px;border:1px solid var(--line);border-radius:10px;background:var(--white);color:var(--ink);text-decoration:none;font-size:15.5px;font-weight:500;max-width:100%;word-break:break-all}
+.file-chip:hover{border-color:var(--ai);color:var(--ai)}
 details.sec-more{margin-top:10px}
 details.sec-more > summary{list-style:none;cursor:pointer;font-size:12.5px;color:var(--ai);
   padding:3px 0;display:inline-flex;align-items:center;gap:5px}
@@ -716,6 +718,8 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
     <div style="margin-top:10px">
       <input type="file" id="sec-img-file" accept="image/*" style="display:none">
       <button class="add-res-btn" style="margin-bottom:0" id="sec-img-btn">🖼 画像をアップロードして挿入</button>
+      <input type="file" id="sec-file-file" accept=".pdf,.docx,.doc,.pptx,.xlsx,.zip,.txt,.md,.csv" style="display:none">
+      <button class="add-res-btn" style="margin-bottom:0" id="sec-file-btn">📎 ファイル（PDFなど）を添付</button>
       <span class="muted" id="sec-img-status"></span>
     </div>
     <div style="margin-top:20px"><button class="primary-btn" id="sec-save">保存する</button></div>
@@ -1411,6 +1415,16 @@ function richText(t){
          (l.includes('/room-media/') && !/\.(pdf|docx?|xlsx?|pptx?|zip|html?|csv|txt)(\?|#|$)/i.test(l)))) {
       return `<img src="${l}" alt="" style="max-width:100%;border-radius:8px;margin:8px 0" loading="lazy">`;
     }
+    // room-media に置いた PDF・Word などのファイルは、URL の代わりに「📄 ファイル名」のボタンで出す
+    //   「配布資料.pdf https://…」のように URL の前に書いた文字が表示名になる（添付ボタンは元のファイル名を自動で入れる）
+    const fm = l.match(/^(.*?)\s*(https?:\/\/\S+\/room-media\/\S+\.(?:pdf|docx?|pptx?|xlsx?|zip|txt|md|csv))(?:[?#]\S*)?$/i);
+    if (fm) {
+      const u = fm[2];
+      const raw = decodeURIComponent(u.split('/').pop());
+      const name = fm[1].trim() || raw.replace(/^\d{13}-/, '');   // 表示名がなければファイル名（先頭のタイムスタンプは見せない）
+      const dl = /\.pdf$/i.test(u) ? '' : ' download';               // PDF はブラウザで開く。それ以外はダウンロード
+      return `<a class="file-chip" href="${esc(u)}" target="_blank" rel="noopener"${dl}>📄 ${esc(name)}</a>`;
+    }
     return line
       .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>')
       .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');   // **はさむ** で太字
@@ -1754,6 +1768,25 @@ $('sec-img-file').onchange = async () => {
   ta.value = (ta.value ? ta.value.replace(/\n*$/, '\n\n') : '') + data.publicUrl + '\n';
   $('sec-img-status').textContent = '✓ 挿入しました';
   $('sec-img-file').value = '';
+};
+/* セクションにファイル（PDF・Word など）を添付する。room-media/<slug>/files/ に置き、本文に URL を1行入れる。
+   表示側（richText）が、その行を「📄 ファイル名」のリンクに変える */
+$('sec-file-btn').onclick = () => $('sec-file-file').click();
+$('sec-file-file').onchange = async () => {
+  const file = $('sec-file-file').files[0];
+  if (!file) return;
+  $('sec-img-status').textContent = 'アップロード中…';
+  try {
+    const { url } = await uploadRoomFile(file, 'files');
+    const ta = $('sec-body');
+    // 「元のファイル名 URL」の形で入れる。URL の前の文字が表示名になるので、あとから書き換えてよい
+    ta.value = (ta.value ? ta.value.replace(/\n*$/, '\n\n') : '') + file.name + ' ' + url + '\n';
+    $('sec-img-status').textContent = '✓ 添付しました';
+  } catch (e) {
+    $('sec-img-status').textContent = '';
+    toast('ファイルのアップロードに失敗しました：' + e.message);
+  }
+  $('sec-file-file').value = '';
 };
 /* 期の紹介の画像。セクションと同じく、読み込み時に一度だけ付ける */
 $('ch-img-btn').onclick = () => $('ch-img-file').click();
