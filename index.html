@@ -909,11 +909,11 @@ const EN = {
   'なんでも窓口':'Ask anything','はじめる':'Start here','Creating ノート':'Creating Note',
   '体験セッション':'Trial sessions','望む結果を創り出す':'Create the result you want',
   '管理者':'Admin','編集者':'Editor','メンバー':'Member','未所属':'—',
-  '基本情報':'Info','クラス記録':'Class records','質問':'Questions','リソース':'Resources','シリーズ':'Series','Creatingノート':'Creating Note','今日をつくる':'Create Today',
+  '基本情報':'Info','クラス記録':'Class records','RFC提供ツール':'RFC tools','みんなのツール':'Member tools','学びの機会':'Learning opportunities','質問':'Questions','リソース':'Resources','シリーズ':'Series','Creatingノート':'Creating Note','今日をつくる':'Create Today',
   '参加者・支払い確認':'Participants','権限':'Roles',
   '📔 はじめかた':'📔 Getting started','はじめかた':'Getting started',
   '構造コンサルタント認定（SCCP）':'SCCP – Structural Consultant Certification','フリッツ・ビジネススクール':'Fritz Business School',
-  'FST修了者':'FST Alumni','創造プロセス倶楽部':'Creative Process Club','読書会':'Book Club',
+  'FSTの部屋':'FST Room','創造プロセス倶楽部':'Creative Process Club','読書会':'Book Club',
   'すべて':'All','＋ クラス回を追加':'+ Add a class','🔍 概要・アサインメントで検索…':'🔍 Search description / assignment…',
   '動画を開く':'Open video','▶ 動画を開く':'▶ Open video','アサインメント':'Assignment','🔑 動画パスワード':'🔑 Video password','コピー':'Copy',
   'タップでコピー':'Tap to copy','パスワードをコピーしました':'Password copied','該当する動画がありません':'No videos found','編集':'Edit','削除':'Delete',
@@ -1162,7 +1162,9 @@ function openRoom(room){
   // Creating ノート（道具）は、開いたらすぐチャートを書ける画面から始める。
   // 質問は「なんでも窓口」に一本化した。回ごとに質問が要る 21 Lessons だけ、部屋の中に残す。
   const showChat = room.slug === 'lessons21';
-  const tabs = isEntranceRoom(room)
+  const tabs = room.slug === 'fst'   // FSTの部屋：ツール置き場＋学びの機会の拠点
+    ? [['pinned','基本情報'],['resources','RFC提供ツール'],['tools','みんなのツール'],['session','学びの機会']]
+    : isEntranceRoom(room)
     ? [['pinned','基本情報'],['session','体験セッション'],['resources','リソース']]
     : isNoteRoom(room)
     ? [['chart','望む結果を創り出す'],['pinned','基本情報'],['resources','リソース']]
@@ -1199,8 +1201,8 @@ function showTab(tab){
   $('tabs').querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
   if (S.current.host) { S.current = { type:'room', room: S.current.host }; }
   if (tab === 'chart') { renderNote(true); return; }              // Creating ノート：チャートを書く画面
-  if (tab === 'session') { renderPinned({ secTab:'session' }); return; }   // 体験セッション
-  ({pinned:renderPinned, archive:renderArchive, chat:renderChat, resources:renderResources, members:renderMembers})[tab]();
+  if (tab === 'session') { renderPinned({ secTab:'session' }); return; }   // 体験セッション／学びの機会
+  ({pinned:renderPinned, archive:renderArchive, chat:renderChat, resources:renderResources, tools:renderResources, members:renderMembers})[tab]();
 }
 
 /* ===== ファイルアップロード共通（テキスト系は文字コードを明示して文字化けを防ぐ） ===== */
@@ -2053,7 +2055,9 @@ async function renderResources(){
       </div>`).join('');
   }
 
-  $('page').innerHTML = resSection + toolSection;
+  // FSTの部屋は「RFC提供ツール」と「みんなのツール」を別タブに分ける
+  const splitTabs = S.current.room.slug === 'fst';
+  $('page').innerHTML = S.tab === 'tools' ? toolSection : (splitTabs ? resSection : resSection + toolSection);
   bindCopyBoxes($('page'));
 
   const atb = $('add-tool');
