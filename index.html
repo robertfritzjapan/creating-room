@@ -914,7 +914,7 @@ const fmtMonth = d => { const [y,m]=String(d).split('-'); return isEN() ? new Da
    クラス記録だけは title_en / description_en / assignment_en があればそちらを出す。 */
 const isEN = () => S.profile?.lang === 'en';
 const EN = {
-  'ホーム':'Home','新着フィード':'What\'s new','ピンした場所':'Pinned','未返信':'Unanswered','レッスンを出す':'Post a lesson',
+  'ホーム':'Home','新着フィード':'What\'s new','ピンした場所':'Pinned','未返信':'Unanswered','返事が届いています':'You have a reply','レッスンを出す':'Post a lesson',
   'みんなとつくる':'Create together','ワークショップ':'Workshops','Wayのクラス':'Way classes','ログアウト':'Log out','権限を見る':'My access',
   'なんでも窓口':'Ask anything','はじめる':'Start here','Creating ノート':'Creating Note',
   '体験セッション':'Trial sessions','望む結果を創り出す':'Create the result you want',
@@ -1090,7 +1090,9 @@ function renderNav(){
   };
   let h = `<div class="nav-label">${t('ホーム')}</div>
     <div class="nav-item" data-nav="home"><span class="dot"></span>${t('新着フィード')}</div>`;
-  if (entrance) h += `<div class="nav-item" data-nav="inbox"><span class="dot"></span>${t('なんでも窓口')}</div>`;
+  // なんでも窓口の⭕️：事務局には未返信の数、相談者には届いた返事の数（lessons.js の fetchInboxCount）
+  const inboxBadge = L.inboxCount ? `<span class="nav-badge" title="${canEdit(entrance?.id) ? t('未返信') : t('返事が届いています')}">${L.inboxCount}</span>` : '';
+  if (entrance) h += `<div class="nav-item" data-nav="inbox"><span class="dot"></span><span class="nav-name">${t('なんでも窓口')}</span>${inboxBadge}</div>`;
   h += `<div class="nav-item" data-nav="pins"><span class="dot"></span>${t('ピンした場所')}</div>`;
   // Creating Way グループ：はじめる・ノート・Wayのクラスの部屋をひとまとめ
   const wayRooms = S.rooms.filter(r => navGroupOf(r) === 'class');
@@ -1977,6 +1979,13 @@ async function renderChat(){
 
   $('page').innerHTML = `<div class="q-wrap">${newFormHtml}${listHtml}</div>`;
 
+  // 相談者が開いたら「ここまで見た」を記録して、メニューの⭕️を消す（事務局側は返信した時点で消える）
+  if (!isAdmin && ids.length) {
+    const now = new Date().toISOString();
+    const { error: se } = await supa.from('inquiries').update({ user_seen_at: now }).in('id', ids).eq('user_id', S.user.id);
+    if (!se) refreshInboxCount();
+  }
+
   const nb = $('q-new-send');
   if (nb) nb.onclick = async () => {
     const body = $('q-new-body').value.trim();
@@ -1990,7 +1999,7 @@ async function renderChat(){
     nb.disabled = false;
     if (e2) return toast('送信に失敗しました：' + e2.message);
     toast('質問を送りました');
-    renderChat();
+    renderChat(); refreshInboxCount();
   };
 
   $('page').querySelectorAll('[data-reply-send]').forEach(el => el.onclick = async () => {
@@ -2003,7 +2012,7 @@ async function renderChat(){
       .insert({ inquiry_id: inqId, sender_id: S.user.id, body });
     el.disabled = false;
     if (e2) return toast('送信に失敗しました：' + e2.message);
-    renderChat();
+    renderChat(); refreshInboxCount();
   });
 
   $('page').querySelectorAll('[data-resolve]').forEach(el => el.onclick = async () => {
@@ -2011,7 +2020,7 @@ async function renderChat(){
     const newStatus = el.dataset.status === 'open' ? 'resolved' : 'open';
     const { error: e2 } = await supa.from('inquiries').update({ status: newStatus }).eq('id', inqId);
     if (e2) return toast('更新に失敗しました：' + e2.message);
-    renderChat();
+    renderChat(); refreshInboxCount();
   });
 }
 
