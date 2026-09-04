@@ -506,6 +506,11 @@ a{color:var(--ai)}
 .sec-lead{font-size:16px;line-height:1.9}
 .file-chip{display:inline-flex;align-items:center;gap:6px;margin:6px 0;padding:9px 16px;border:1px solid var(--line);border-radius:10px;background:var(--white);color:var(--ink);text-decoration:none;font-size:15.5px;font-weight:500;max-width:100%;word-break:break-all}
 .file-chip:hover{border-color:var(--ai);color:var(--ai)}
+.yt{position:relative;display:block;max-width:640px;aspect-ratio:16/9;margin:10px 0;border-radius:10px;overflow:hidden;background:#000;cursor:pointer}
+.yt img{width:100%;height:100%;object-fit:cover;display:block;margin:0;border-radius:0}
+.yt iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.yt-play{position:absolute;left:50%;top:50%;width:68px;height:48px;margin:-24px 0 0 -34px;border-radius:12px;background:rgba(166,38,44,.92);color:#fff;font-size:22px;display:flex;align-items:center;justify-content:center;padding-left:4px;box-shadow:0 2px 10px rgba(0,0,0,.3)}
+.yt:hover .yt-play{background:var(--ai)}
 details.sec-more{margin-top:10px}
 details.sec-more > summary{list-style:none;cursor:pointer;font-size:12.5px;color:var(--ai);
   padding:3px 0;display:inline-flex;align-items:center;gap:5px}
@@ -1417,6 +1422,16 @@ function richText(t){
          (l.includes('/room-media/') && !/\.(pdf|docx?|xlsx?|pptx?|zip|html?|csv|txt)(\?|#|$)/i.test(l)))) {
       return `<img src="${l}" alt="" style="max-width:100%;border-radius:8px;margin:8px 0" loading="lazy">`;
     }
+    // YouTube の URL だけの行 → サムネイル＋▶ を出し、押すとその場で再生する
+    //   「画像URL YouTubeURL」のように前に画像 URL を書くと、その画像をサムネイルにする
+    const ym = l.match(/^(?:(https?:\/\/\S+\.(?:png|jpe?g|gif|webp)(?:\?\S*)?)\s+)?(?:https?:\/\/)?(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?(?:\S*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{11})\S*$/);
+    if (ym) {
+      const id = ym[2];
+      const thumb = ym[1] ? esc(ym[1]) : `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`;
+      const fb = ym[1] ? '' : ` onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/${id}/hqdefault.jpg'"`;
+      return `<div class="yt" data-yt="${id}" role="button" tabindex="0" title="再生する">
+        <img src="${thumb}" alt="" loading="lazy"${fb}><span class="yt-play">▶</span></div>`;
+    }
     // room-media に置いた PDF・Word などのファイルは、URL の代わりに「📄 ファイル名」のボタンで出す
     //   「配布資料.pdf https://…」のように URL の前に書いた文字が表示名になる（添付ボタンは元のファイル名を自動で入れる）
     const fm = l.match(/^(.*?)\s*(https?:\/\/\S+\/room-media\/\S+\.(?:pdf|docx?|pptx?|xlsx?|zip|txt|md|csv))(?:[?#]\S*)?$/i);
@@ -1435,6 +1450,16 @@ function richText(t){
 /* 基本情報を描き直す。Creatingノートのタブにいるときは、タブごと描き直してノートを保ち直す */
 const repaintPinned = () => (S.tab === 'chart' ? showTab('chart') : S.tab === 'session' ? showTab('session') : renderPinned());
 
+/* YouTube のサムネイルを押したら、その場でプレーヤーに差し替えて再生する（どの画面でも効くよう document で受ける） */
+document.addEventListener('click', e => {
+  const box = e.target.closest('.yt[data-yt]');
+  if (!box || box.querySelector('iframe')) return;
+  e.preventDefault();
+  box.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${box.dataset.yt}?autoplay=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen title="YouTube"></iframe>`;
+});
+document.addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('.yt[data-yt]')) { e.preventDefault(); e.target.click(); }
+});
 /* コピー枠のボタンを効かせる。基本情報でもリソースでも使う */
 function bindCopyBoxes(root){
   (root || document).querySelectorAll('[data-copybox]').forEach(el => el.onclick = async e => {
