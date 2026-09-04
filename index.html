@@ -494,6 +494,9 @@ a{color:var(--ai)}
 .cs-t i{font-style:normal;color:var(--ai);margin-right:5px}
 .cs-q{font-size:12.5px;color:var(--gray);line-height:1.7;text-align:center;margin:2px 0 10px}
 .cs-tent{display:block;width:100%;height:24px}
+.cs-check{margin-top:14px;border:1.5px dashed var(--ink);border-radius:6px;padding:14px 16px;background:#fff}
+.cn-point{background:#faf8f7;border-left:3px solid var(--ai);border-radius:0 6px 6px 0;padding:12px 16px;margin:0 0 16px;font-size:14.5px;line-height:1.85;color:var(--ink)}
+.cn-point b{display:block;font-weight:600;margin-bottom:2px}
 .cs-mid{border-left:1.5px solid var(--ink);border-right:1.5px solid var(--ink);padding:0 16px 14px}
 .cn-act{display:flex;gap:8px;align-items:flex-start;margin-bottom:7px}
 .cn-act .cn-ta{min-height:44px;flex:1}
@@ -511,6 +514,33 @@ a{color:var(--ai)}
 .yt iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 .yt-play{position:absolute;left:50%;top:50%;width:68px;height:48px;margin:-24px 0 0 -34px;border-radius:12px;background:rgba(166,38,44,.92);color:#fff;font-size:22px;display:flex;align-items:center;justify-content:center;padding-left:4px;box-shadow:0 2px 10px rgba(0,0,0,.3)}
 .yt:hover .yt-play{background:var(--ai)}
+/* 見本の組（✕／○ の画像を横に並べる） */
+.cmp-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin:12px 0 16px}
+.cmp-grid.one{grid-template-columns:1fr;max-width:420px}
+@media (max-width:520px){.cmp-grid{grid-template-columns:1fr}}
+.cmp-fig{margin:0;min-width:0}
+.cmp-open{position:relative;display:block;border:1px solid var(--line);border-radius:10px;background:#fff;padding:8px;cursor:zoom-in;transition:box-shadow .15s}
+.cmp-open:hover{box-shadow:0 4px 18px rgba(0,0,0,.12)}
+.cmp-open img{display:block;width:100%;height:auto;margin:0;border-radius:4px}
+.cmp-badge{position:absolute;top:12px;right:12px;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.cmp-badge.bad{background:#c0392b}
+.cmp-badge.good{background:#2e7d5b}
+.cmp-fig figcaption{margin-top:8px;font-size:15px;font-weight:600;line-height:1.5;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.cmp-fig figcaption.bad{color:#c0392b}
+.cmp-fig figcaption.good{color:#2e7d5b}
+.cmp-hint{font-size:12px;font-weight:400;color:var(--gray)}
+/* ライトボックス */
+.lb[hidden]{display:none}
+.lb{position:fixed;inset:0;z-index:2000;background:rgba(20,18,17,.92);display:flex;align-items:center;justify-content:center;padding:16px}
+.lb-body{max-width:min(96vw,1100px);max-height:96vh;display:flex;flex-direction:column;align-items:center;gap:10px}
+.lb-body img{max-width:100%;max-height:calc(96vh - 48px);object-fit:contain;background:#fff;border-radius:6px}
+.lb-cap{color:#fff;font-size:15px;font-weight:600;text-align:center}
+.lb-prev[hidden],.lb-next[hidden]{display:none}
+.lb-x,.lb-prev,.lb-next{position:absolute;background:rgba(255,255,255,.14);color:#fff;border:none;border-radius:50%;width:44px;height:44px;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.lb-x:hover,.lb-prev:hover,.lb-next:hover{background:rgba(255,255,255,.3)}
+.lb-x{top:14px;right:14px}
+.lb-prev{left:10px;top:50%;margin-top:-22px;font-size:30px}
+.lb-next{right:10px;top:50%;margin-top:-22px;font-size:30px}
 details.sec-more{margin-top:10px}
 details.sec-more > summary{list-style:none;cursor:pointer;font-size:12.5px;color:var(--ai);
   padding:3px 0;display:inline-flex;align-items:center;gap:5px}
@@ -1264,6 +1294,7 @@ function cnEntryText(k, e){
   if (e.goal)    s += `望む成果：${e.goal}\n`;
   if (e.reality) s += `いまの現実：${e.reality}\n`;
   if (e.actions?.length) s += '今日すること：\n' + e.actions.map(a => `・${a.text}${a.min ? `（${a.min}）` : ''}`).join('\n') + '\n';
+  if (e.check)   s += `チェック：${e.check}\n`;
   return s;
 }
 async function renderNote(hasRoom){
@@ -1306,6 +1337,10 @@ async function renderNote(hasRoom){
   const formHtml = `
       <div class="cn-meta"><b>${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日（${CN_WD[now.getDay()]}）</b><span>Day ${dayNo}</span></div>
       ${yest}
+      <div class="cn-point">
+        <b>ポイント：映像で思い浮かべる</b>
+        望む成果も、今の現実も、アクションステップも、文字で書くだけでなく、その場面を映像として思い浮かべてみてください。映像にすると、④のチェックの精度がまったく違ってきます。そして一日中、望む成果に向かうテンションが張り続けます。映像化は構造思考の大切なスキルで、学んで身につけることができます。
+      </div>
       <div class="cs">
         <div class="cs-box cs-goal">
           <div class="cs-t"><i>①</i>望む成果</div>
@@ -1326,6 +1361,11 @@ async function renderNote(hasRoom){
           <div class="cs-q">望む成果と今の現実のあいだのテンションを、解消する行動。いつやるかも書きましょう。</div>
           <div id="cn-acts">${Array.from({ length: rowCount }, (_, i) => actRow(i, acts[i])).join('')}</div>
         </div>
+      </div>
+      <div class="cs-check">
+        <div class="cs-t"><i>④</i>チェック</div>
+        <div class="cs-q">これらのアクションを取れば、望む成果は得られますか。映像で確かめてみましょう。<br>得られないとわかったら、③のアクションを調整します。</div>
+        <textarea class="cn-ta" id="cn-check" placeholder="例：これでは午前中に終わらない → 1を先にやる、2は明日に回す／これで得られそう">${esc(today.check || '')}</textarea>
       </div>
       <div class="cn-bar">
         <button class="add-res-btn" id="cn-copy">全部をコピー</button>
@@ -1366,14 +1406,14 @@ async function renderNote(hasRoom){
   let timer = null;
   function save(quiet){
     const entry = {
-      reflect: val('cn-reflect'), goal: val('cn-goal'), reality: val('cn-reality'),
+      reflect: val('cn-reflect'), goal: val('cn-goal'), reality: val('cn-reality'), check: val('cn-check'),
       actions: [...actsWrap.querySelectorAll('.cn-act')].map(r => ({
         text: r.querySelector('.cn-act-t').value.trim(),
         min: r.querySelector('.cn-act-m').value.trim(),
       })).filter(a => a.text),
       ts: Date.now(),
     };
-    const empty = !entry.reflect && !entry.goal && !entry.reality && !entry.actions.length;
+    const empty = !entry.reflect && !entry.goal && !entry.reality && !entry.actions.length && !entry.check;
     if (empty) delete data[todayKey]; else data[todayKey] = entry;
     const ok = cnStore(data);
     const el = $('cn-saved');
@@ -1411,8 +1451,42 @@ async function renderNote(hasRoom){
 }
 
 /* ===== 基本情報 ===== */
+/* 「✕ ラベル 画像URL」「○ ラベル 画像URL」の行が続いたら、横に並べた見本の組にする（押すと拡大）
+   例：✕ 間違った書き方 https://…/a.jpg
+       ○ 正しい書き方 https://…/b.jpg
+   ✕○ を付けない「ラベル 画像URL」の行も見本として並ぶ。画像だけの行は今まで通り大きく出す */
+const CMP_RE = /^([✕×✗❌⭕○◯〇])?\s*(.*?)\s*(https?:\/\/\S+?(?:\.(?:png|jpe?g|gif|webp)(?:\?\S*)?|\/room-media\/\S+))$/i;
+function cmpLine(l){
+  const m = l.match(CMP_RE);
+  if (!m || !m[2]) return null;                              // ラベルがない＝ただの画像行
+  if (/\.(pdf|docx?|xlsx?|pptx?|zip|html?|csv|txt|mp4|webm|mov)(\?|#|$)/i.test(m[3])) return null;
+  if (/youtu\.?be/i.test(l)) return null;
+  const mark = m[1] ? (/[✕×✗❌]/.test(m[1]) ? 'bad' : 'good') : '';
+  return { mark, label: m[2], url: m[3] };
+}
 function richText(t){
-  return esc(t || '').split('\n').map(line => {
+  const lines = esc(t || '').split('\n');
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    const figs = [];
+    while (i < lines.length) { const f = cmpLine(lines[i].trim()); if (!f) break; figs.push(f); i++; }
+    if (figs.length) {
+      out.push({ block: true, html: `<div class="cmp-grid${figs.length === 1 ? ' one' : ''}">${figs.map(f => `
+        <figure class="cmp-fig">
+          <a class="cmp-open" href="${f.url}" data-lb="${f.url}" data-lb-cap="${f.mark === 'bad' ? '✕ ' : f.mark === 'good' ? '○ ' : ''}${f.label}" title="拡大して見る">
+            <img src="${f.url}" alt="${f.label}" loading="lazy">
+            ${f.mark ? `<span class="cmp-badge ${f.mark}">${f.mark === 'bad' ? '✕' : '○'}</span>` : ''}
+          </a>
+          <figcaption${f.mark ? ` class="${f.mark}"` : ''}>${f.mark === 'bad' ? '✕ ' : f.mark === 'good' ? '○ ' : ''}${f.label}<span class="cmp-hint">タップで拡大</span></figcaption>
+        </figure>`).join('')}</div>` });
+      i--; continue;
+    }
+    out.push({ block: false, html: richLine(lines[i]) });
+  }
+  return out.map((o, i) => (i && !o.block && !out[i - 1].block ? '<br>' : '') + o.html).join('');
+}
+function richLine(line){
+  {
     const l = line.trim();
     if (/^https?:\/\/\S+$/.test(l) && /\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(l)) {
       return `<video src="${l}" controls playsinline preload="metadata" style="max-width:100%;border-radius:8px;margin:8px 0"></video>`;
@@ -1420,7 +1494,7 @@ function richText(t){
     if (/^https?:\/\/\S+$/.test(l) &&
         (/\.(png|jpe?g|gif|webp|svg)(\?|#|$)/i.test(l) ||
          (l.includes('/room-media/') && !/\.(pdf|docx?|xlsx?|pptx?|zip|html?|csv|txt)(\?|#|$)/i.test(l)))) {
-      return `<img src="${l}" alt="" style="max-width:100%;border-radius:8px;margin:8px 0" loading="lazy">`;
+      return `<img src="${l}" alt="" style="max-width:100%;border-radius:8px;margin:8px 0;cursor:zoom-in" loading="lazy" data-lb="${l}">`;
     }
     // YouTube の URL だけの行 → サムネイル＋▶ を出し、押すとその場で再生する
     //   「画像URL YouTubeURL」のように前に画像 URL を書くと、その画像をサムネイルにする
@@ -1445,7 +1519,7 @@ function richText(t){
     return line
       .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>')
       .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');   // **はさむ** で太字
-  }).join('<br>');
+  }
 }
 /* 基本情報を描き直す。Creatingノートのタブにいるときは、タブごと描き直してノートを保ち直す */
 const repaintPinned = () => (S.tab === 'chart' ? showTab('chart') : S.tab === 'session' ? showTab('session') : renderPinned());
@@ -1459,6 +1533,53 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('keydown', e => {
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('.yt[data-yt]')) { e.preventDefault(); e.target.click(); }
+});
+
+/* 画像の拡大表示（ライトボックス）。data-lb を持つ画像・リンクを押すと開く。
+   同じ組（.cmp-grid）の中なら ← → で隣へ。Esc・背景タップ・✕ で閉じる */
+const LB = { items: [], idx: 0 };
+function lbEl(){
+  let el = $('lightbox');
+  if (el) return el;
+  document.body.insertAdjacentHTML('beforeend', `<div id="lightbox" class="lb" hidden>
+    <button class="lb-x" aria-label="閉じる">✕</button>
+    <button class="lb-prev" aria-label="前へ">‹</button>
+    <div class="lb-body"><img alt=""><div class="lb-cap"></div></div>
+    <button class="lb-next" aria-label="次へ">›</button>
+  </div>`);
+  el = $('lightbox');
+  el.onclick = e => { if (e.target === el || e.target.classList.contains('lb-body')) lbClose(); };
+  el.querySelector('.lb-x').onclick = lbClose;
+  el.querySelector('.lb-prev').onclick = e => { e.stopPropagation(); lbShow(LB.idx - 1); };
+  el.querySelector('.lb-next').onclick = e => { e.stopPropagation(); lbShow(LB.idx + 1); };
+  return el;
+}
+function lbShow(i){
+  const el = lbEl();
+  if (!LB.items.length) return;
+  LB.idx = (i + LB.items.length) % LB.items.length;
+  const it = LB.items[LB.idx];
+  el.querySelector('img').src = it.src;
+  el.querySelector('.lb-cap').textContent = it.cap || '';
+  const many = LB.items.length > 1;
+  el.querySelector('.lb-prev').hidden = !many; el.querySelector('.lb-next').hidden = !many;
+  el.hidden = false; document.body.style.overflow = 'hidden';
+}
+function lbClose(){ const el = $('lightbox'); if (el) el.hidden = true; document.body.style.overflow = ''; }
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-lb]');
+  if (!t) return;
+  e.preventDefault();
+  const grid = t.closest('.cmp-grid');
+  const nodes = grid ? [...grid.querySelectorAll('[data-lb]')] : [t];
+  LB.items = nodes.map(n => ({ src: n.dataset.lb, cap: n.dataset.lbCap || '' }));
+  lbShow(nodes.indexOf(t));
+});
+document.addEventListener('keydown', e => {
+  const el = $('lightbox'); if (!el || el.hidden) return;
+  if (e.key === 'Escape') lbClose();
+  else if (e.key === 'ArrowLeft') lbShow(LB.idx - 1);
+  else if (e.key === 'ArrowRight') lbShow(LB.idx + 1);
 });
 /* コピー枠のボタンを効かせる。基本情報でもリソースでも使う */
 function bindCopyBoxes(root){
