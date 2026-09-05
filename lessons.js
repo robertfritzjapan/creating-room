@@ -131,22 +131,15 @@ async function openRoomAbout(room){
       <button class="add-res-btn" style="margin:0" id="about-edit">✏️ 紹介ページを編集</button>
       <button class="ghost-btn" style="margin:0" id="about-back">部屋に戻る</button>
     </div>` : '';
-  // 「ここで何をするか」の1行目が写真の URL なら、部屋名の上に大きく出す（文面の中には出さない）
-  let what = room.about_what || '', hero = '';
-  const m = what.match(/^\s*(https?:\/\/\S+)\s*\n?/);
-  if (m && (/\.(png|jpe?g|gif|webp)(\?|#|$)/i.test(m[1]) || m[1].includes('/room-media/'))) {
-    hero = m[1]; what = what.slice(m[0].length).replace(/^\n+/, '');
-  }
   h += `<div class="card about-card">
-    ${hero ? `<img class="about-hero" src="${esc(hero)}" alt="" loading="lazy">` : ''}
     <h2 class="about-title">${esc(room.name)}</h2>
     ${room.subtitle ? `<p class="about-sub">${esc(room.subtitle)}</p>` : ''}
-    ${what ? `<div class="about-kv"><div class="k">ここで何をするか</div><div class="v">${richText(what)}</div></div>` : ''}
+    ${room.about_what ? `<div class="about-kv"><div class="k">ここで何をするか</div><div class="v">${richText(room.about_what)}</div></div>` : ''}
     ${room.about_how  ? `<div class="about-kv"><div class="k">入り方</div><div class="v">${richText(room.about_how)}</div></div>` : ''}
     ${!room.about_what && !room.about_how ? `<p class="muted">紹介文は準備中です。</p>` : ''}
   </div>`;
   if (vis === 'public') {
-    h += `<div class="card"><p style="font-size:16px;margin-bottom:12px">どなたでも入れます。</p><button class="primary-btn" id="about-join">参加する</button></div>`;
+    h += `<div class="card"><p style="font-size:13px;margin-bottom:12px">どなたでも入れます。</p><button class="primary-btn" id="about-join">参加する</button></div>`;
   } else if (openC.length) {
     h += openC.map(c => `
       <div class="card">
@@ -165,7 +158,7 @@ async function openRoomAbout(room){
   h += `<div class="card">
       <div class="${room.next_intake ? 'about-intake' : 'nocta'}">${room.next_intake ? richText(room.next_intake) : 'いまは募集していません'}</div>
     ${room.cta_url
-      ? `<a class="primary-btn" href="${esc(room.cta_url)}" target="_blank" rel="noopener">${esc(room.cta_label || '詳細を見る')}</a>`
+      ? `<a class="primary-btn" href="${esc(room.cta_url)}" target="_blank" rel="noopener">${esc(room.cta_label || '申し込む')}</a>`
          : room.next_intake ? '' : `<button class="ghost-btn" id="about-notify">募集が始まったら知らせる</button>`}
   </div>`;
 }
@@ -808,11 +801,15 @@ function nextDayLabel(c){
   }
   return '明日';
 }
-function tomorrow6amJST(){
-  const p = new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Tokyo', year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(new Date());
+/* 「次に来る朝6時」：日本時間で6時前（深夜作業）なら今日の6時、6時以降なら明日の6時 */
+function next6amJST(){
+  const p = new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Tokyo', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', hour12:false }).formatToParts(new Date());
   const g = t => Number(p.find(x => x.type === t).value);
-  return new Date(Date.UTC(g('year'), g('month') - 1, g('day') + 1, 6 - 9, 0, 0)).toISOString();   // 翌日 06:00 JST
+  const add = g('hour') < 6 ? 0 : 1;
+  return new Date(Date.UTC(g('year'), g('month') - 1, g('day') + add, 6 - 9, 0, 0)).toISOString();
 }
+const am6Label = () => Number(new Intl.DateTimeFormat('en-US', { timeZone:'Asia/Tokyo', hour:'numeric', hour12:false }).format(new Date())) < 6 ? '今朝 6:00' : '明朝 6:00';
+function tomorrow6amJST(){ return next6amJST(); }
 /* 決済リンクの行き先で、ボタンの文字を変える */
 function payLabel(url){
   const u = String(url || '');
@@ -867,7 +864,7 @@ async function openPostPage(lesson, cohort, forceNew){
   updatePinBtn(); highlightNav();
   if (d.imagePath && !d.imageUrl) d.imageUrl = await lessonImageUrl(d.imagePath);
   const isPublished = lesson?.publish_at && new Date(lesson.publish_at) <= new Date();
-  const whenLabel = { now:'出す', am:'明朝 6:00 に出す', date:'その日の朝 6:00 に出す', keep: isPublished ? '更新する' : '保存する' };
+  const whenLabel = { now:'出す', am:am6Label() + ' に出す', date:'その日の朝 6:00 に出す', keep: isPublished ? '更新する' : '保存する' };
   $('page').innerHTML = `
     <div class="postbar">
       <div class="postbar-t">${lesson ? (lesson.publish_at ? `Day ${d.day} を編集` : `Day ${d.day}（下書き）`) : 'レッスンを出す'}</div>
@@ -895,11 +892,11 @@ async function openPostPage(lesson, cohort, forceNew){
       <div class="pseg">
         ${lesson?.publish_at ? `<button data-w="keep" class="${d.when === 'keep' ? 'on' : ''}">${isPublished ? 'そのまま更新' : fmtWhen(lesson.publish_at) + ' のまま'}</button>` : ''}
         <button data-w="now" class="${d.when === 'now' ? 'on' : ''}">今すぐ出す</button>
-        <button data-w="am" class="${d.when === 'am' ? 'on' : ''}">明朝 6:00 に出す</button>
+        <button data-w="am" class="${d.when === 'am' ? 'on' : ''}">${am6Label()} に出す</button>
         <button data-w="date" class="${d.when === 'date' ? 'on' : ''}">日付を選ぶ</button>
       </div>
       ${d.when === 'date' ? `<div style="margin-top:8px"><input type="date" id="p-date" class="pinput" style="max-width:200px" value="${d.date || ''}"></div>` : ''}
-      <div class="phint">${d.when === 'now' ? '押した瞬間に、参加者の画面に出ます' : d.when === 'am' ? '前の晩に書けたときだけ使います。朝6時に自動で出ます' : d.when === 'date' ? '選んだ日の朝6時に自動で出ます' : '公開のタイミングは変えません'}</div>
+      <div class="phint">${d.when === 'now' ? '押した瞬間に、参加者の画面に出ます' : d.when === 'am' ? '次に来る朝6時に自動で出ます（深夜に書けば今日の朝、日中に書けば明日の朝）' : d.when === 'date' ? '選んだ日の朝6時に自動で出ます' : '公開のタイミングは変えません'}</div>
       <button class="pbig" id="p-go2" ${hasContent(d) ? '' : 'disabled'}>${whenLabel[d.when]}</button>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
         <button class="ghost-btn" id="p-back">${esc(c.name)} の一覧へ</button>
@@ -985,7 +982,7 @@ async function openPostPage(lesson, cohort, forceNew){
     const i = L.lessons.findIndex(x => x.id === data.id); if (i >= 0) L.lessons[i] = data; else if (L.cohort?.id === c.id) L.lessons.push(data);
     $('page').innerHTML = `<div class="card done">
       <div class="mk">✓</div>
-      <h2>${d.when === 'am' ? '明朝 6:00 に出ます' : d.when === 'date' ? fmtDay(data.publish_at) + ' の朝 6:00 に出ます' : `Day ${data.day_no} を出しました`}</h2>
+      <h2>${(d.when === 'am' || d.when === 'date') ? fmtDay(data.publish_at) + ' の朝 6:00 に出ます' : `Day ${data.day_no} を出しました`}</h2>
       <p>${(d.when === 'am' || d.when === 'date') ? 'いま書いたものは保存されています。<br>その朝6時に自動で出ます。それまでは直せます。' : '参加者の画面に並びました。<br>コメントが付くと「未返信」に入ります。'}</p>
       <div class="sub"><b>${esc(data.title || '（タイトルなし）')}</b><br>本文 ${(data.body || '').length}文字${data.image_path ? '　／　画像 1枚' : '　／　画像なし'}<br>${esc(c.name)} ・ Day ${data.day_no}</div>
       <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px">
@@ -1236,45 +1233,15 @@ async function openCohortChat(c, opts = {}){
   const lastSeen = lastSeenOf(c.id);
   const cm = myCMFor(c.id);
 
-  // スレッド化：返信は元コメントの直下にぶら下げる（返信の返信も同じ束に時間順）
-  const rootOf = x => { let cur = x, guard = 0; while (cur.parent_id && byId[cur.parent_id] && guard++ < 50) cur = byId[cur.parent_id]; return cur; };
-  const threads = {};   // root id -> replies[]
-  const roots = [];
-  comments.forEach(x => {
-    const r = rootOf(x);
-    if (r === x) { roots.push(x); threads[x.id] = threads[x.id] || []; }
-    else (threads[r.id] = threads[r.id] || []).push(x);
-  });
-  // Day ごとにまとめる：各レッスンの吹き出しの下に、その Day のコメント束を時間順で
-  const items = [];
-  const rootByLesson = {};
-  roots.forEach(x => (rootByLesson[x.lesson_id] = rootByLesson[x.lesson_id] || []).push(x));
-  published.forEach(l => {
-    items.push({ t: l.publish_at, kind:'lesson', l });
-    (rootByLesson[l.id] || []).sort((a,b) => a.created_at.localeCompare(b.created_at))
-      .forEach(x => items.push({ t: x.created_at, kind:'comment', x, replies: threads[x.id] }));
-  });
+  const items = [
+    ...published.map(l => ({ t: l.publish_at, kind:'lesson', l })),
+    ...comments.map(x => ({ t: x.created_at, kind:'comment', x })),
+  ].sort((a,b) => a.t.localeCompare(b.t));
 
   let firstNew = null;
-  const newMarkFor = (t, x) => {
-    const isNew = t > lastSeen && !(x && x.user_id === S.user.id);
-    return isNew && !firstNew ? (firstNew = true, `<div class="day-divider" id="first-new"><span style="color:var(--ai)">ここから新しい</span></div>`) : '';
-  };
-  const renderComment = (x, root) => {
-    const mine = x.user_id === S.user.id, isEd = editors.includes(x.user_id);
-    const parent = x.parent_id ? byId[x.parent_id] : null;
-    const showQuote = parent && root && parent.id !== root.id;   // 束の中で、元コメント以外への返信だけ引用を出す
-    return newMarkFor(x.created_at, x) + `<div class="msg ${mine ? 'mine' : ''}" id="c-${x.id}"${root ? ' style="margin-bottom:12px"' : ''}>
-      <div class="avatar cav ${isEd ? 'cav-ed' : ''}"${root ? ' style="width:26px;height:26px;font-size:11px"' : ''}>${esc(initialOf(S.profilesCache[x.user_id]))}</div>
-      <div class="msg-body">
-        <div class="msg-head"><b>${esc(S.profilesCache[x.user_id] || '…')}</b>${isEd ? '<span class="cwho-ed" style="margin-left:6px">担当</span>' : ''}<span>${fmtWhen(x.created_at)}</span></div>
-        ${showQuote ? `<div class="msg-quote">↩ ${esc(S.profilesCache[parent.user_id] || '')}：${esc(plainText(parent.body).slice(0, 50))}</div>` : ''}
-        <div class="msg-text">${esc(x.body)}</div>
-        <div class="msg-tools"><button data-reply="${(root || x).id}" data-reply-name="${esc(S.profilesCache[x.user_id] || '')}">↩ 返信</button>${(mine || editor) ? `<button data-del="${x.id}">削除</button>` : ''}</div>
-      </div></div>`;
-  };
   const html = items.map(it => {
-    const newMark = it.kind === 'lesson' ? newMarkFor(it.t, null) : '';
+    const isNew = it.t > lastSeen && !(it.kind === 'comment' && it.x.user_id === S.user.id);
+    const newMark = isNew && !firstNew ? (firstNew = it, `<div class="day-divider" id="first-new"><span style="color:var(--ai)">ここから新しい</span></div>`) : '';
     if (it.kind === 'lesson') {
       const l = it.l, ex = plainText(l.body);
       return newMark + `<div class="msg msg-lesson" data-open-lesson="${l.id}">
@@ -1284,11 +1251,16 @@ async function openCohortChat(c, opts = {}){
           <div class="lesson-bubble">${l.image_path ? `<div class="lb-img" data-img="${esc(l.image_path)}"></div>` : ''}<div class="lb-text">${esc(ex.slice(0, CHAT_EXCERPT))}${ex.length > CHAT_EXCERPT ? '…' : ''}</div><div class="lb-more">全文を読む →</div></div>
         </div></div>`;
     }
-    const x = it.x;
-    const replies = (it.replies || []).sort((a,b) => a.created_at.localeCompare(b.created_at));
-    return renderComment(x, null) + (replies.length
-      ? `<div class="thread" style="margin:-8px 0 18px 44px;padding-left:12px;border-left:2px solid #e6e2de">${replies.map(r => renderComment(r, x)).join('')}</div>`
-      : '');
+    const x = it.x, mine = x.user_id === S.user.id, isEd = editors.includes(x.user_id);
+    const parent = x.parent_id ? byId[x.parent_id] : null;
+    return newMark + `<div class="msg ${mine ? 'mine' : ''}" id="c-${x.id}">
+      <div class="avatar cav ${isEd ? 'cav-ed' : ''}">${esc(initialOf(S.profilesCache[x.user_id]))}</div>
+      <div class="msg-body">
+        <div class="msg-head"><b>${esc(S.profilesCache[x.user_id] || '…')}</b>${isEd ? '<span class="cwho-ed" style="margin-left:6px">担当</span>' : ''}<span>${fmtWhen(x.created_at)}</span></div>
+        ${parent ? `<div class="msg-quote">↩ ${esc(S.profilesCache[parent.user_id] || '')}：${esc(plainText(parent.body).slice(0, 50))}</div>` : ''}
+        <div class="msg-text">${esc(x.body)}</div>
+        <div class="msg-tools"><button data-reply="${x.parent_id || x.id}" data-reply-name="${esc(S.profilesCache[x.user_id] || '')}">↩ 返信</button>${(mine || editor) ? `<button data-del="${x.id}">削除</button>` : ''}</div>
+      </div></div>`;
   }).join('');
 
   const latest = published[published.length - 1];
@@ -1298,15 +1270,13 @@ async function openCohortChat(c, opts = {}){
   $('page').innerHTML = `<div class="chat-cols">
     <div class="chat-wrap" id="chat-wrap">
       <div class="chat-scroll" id="chat-scroll">
+        <div class="chat-rule">他の参加者がここに書いた個人的な内容はこの場の外に持ち出さないようお願いします。</div>
         ${c.intro && !published.length ? `<div class="ch-intro" style="font-size:14.5px">${richText(c.intro)}</div>` : ''}
         ${startNote ? `<div class="day-divider"><span>${esc(startNote)}</span></div>` : ''}
         ${unpaid ? `<div class="day-divider"><span style="color:var(--ai)">お支払いの確認待ち（案内は「レッスン一覧」に）</span></div>` : ''}
         ${html}
       </div>
-      <div class="muted" style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:11.5px;padding:6px 14px 0;line-height:1.5">
-        <span>他の参加者がここに書いた個人的な内容は、この場の外に持ち出さないようお願いします。</span>
-        ${(cm || editor) ? `<span id="chat-people" style="white-space:nowrap;cursor:pointer">参加者を見る ›</span>` : ''}
-      </div>
+      ${(cm || editor) ? `<div id="chat-people" class="muted" style="font-size:12px;padding:6px 14px 0;cursor:pointer">参加者を見る ›</div>` : ''}
       <div class="reply-chip" id="reply-chip" style="display:none"></div>
       <div class="chat-input"><textarea id="chat-in" rows="1" placeholder="${canPost ? (editor ? 'ひとこと・返信を書く…' : '質問やコメントを書く…') : 'レッスンが届いたら書けます'}" ${canPost ? '' : 'disabled'}></textarea><button class="send" id="chat-send" ${canPost ? '' : 'disabled'}>↑</button></div>
     </div>

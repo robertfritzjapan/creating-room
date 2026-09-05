@@ -663,6 +663,8 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
       <label class="form-label">補足メモ</label>
       <textarea class="form-input" id="inf-note" rows="2"></textarea>
     </div>
+    <label class="form-label">「基本情報」タブの名前（任意）</label>
+    <input class="form-input" id="inf-tablabel" placeholder="空欄なら「基本情報」　例：はじめに、ご案内、この部屋について">
     <label class="form-label">受付の見出し（任意）</label>
     <input class="form-input" id="inf-sgtitle" placeholder="空欄なら「参加希望の受付」　例：ミニレクチャー参加の受付">
     <div class="inf-full">
@@ -952,7 +954,7 @@ const EN = {
   'ホーム':'Home','新着フィード':'What\'s new','ピンした場所':'Pinned','未返信':'Unanswered','返事が届いています':'You have a reply','レッスンを出す':'Post a lesson',
   'みんなとつくる':'Create together','ワークショップ':'Workshops','Wayのクラス':'Way classes','ログアウト':'Log out','権限を見る':'My access',
   'なんでも窓口':'Ask anything','はじめる':'Start here','Creating ノート':'Creating Note',
-  '体験セッション':'Trial sessions','望む結果を創り出す':'Create the result you want',
+  '体験セッション':'Trial sessions','チャートを書く':'Write your chart',
   '管理者':'Admin','編集者':'Editor','メンバー':'Member','未所属':'—',
   '基本情報':'Info','クラス記録':'Class records','実践ツール':'Practice tools','みんなのツール':'Member tools','学びの機会':'Learning opportunities','質問':'Questions','リソース':'Resources','シリーズ':'Series','Creatingノート':'Creating Note','今日をつくる':'Create Today',
   '参加者・支払い確認':'Participants','権限':'Roles',
@@ -1214,13 +1216,15 @@ function openRoom(room){
     : isEntranceRoom(room)
     ? [['pinned','基本情報'],['session','体験セッション'],['resources','リソース']]
     : isNoteRoom(room)
-    ? [['chart','望む結果を創り出す'],['pinned','基本情報'],['resources','リソース']]
+    ? [['chart','チャートを書く'],['pinned','基本情報'],['resources','リソース']]
     : (navGroupOf(room) === 'class' || navGroupOf(room) === 'workshop')   // Wayのクラスと単発ワークショップはクラス記録なし
     ? [['pinned','基本情報'],...(showChat ? [['chat','質問']] : []),['resources','リソース']]
     : [['pinned','基本情報'],['archive','クラス記録'],...(showChat ? [['chat','質問']] : []),['resources','リソース']];
   if (roleIn(room.id) === 'admin') tabs.push(['members','メンバー']);   // 管理者だけ。entrance では「誰がここまで来ているか」の一覧になる
+  // 「基本情報」タブの名前は部屋ごとに変えられる（基本情報を編集 → タブの名前）
+  const tabLabel = room.pinned?.tab_label;
   $('tabs').innerHTML = tabs.map(([k,label]) =>
-    `<div class="tab" data-tab="${k}">${t(label)}</div>`).join('');
+    `<div class="tab" data-tab="${k}">${k === 'pinned' && tabLabel ? esc(tabLabel) : t(label)}</div>`).join('');
   $('tabs').querySelectorAll('.tab').forEach(el => el.onclick = () => showTab(el.dataset.tab));
   highlightNav();
   showTab(tabs[0][0]);
@@ -1680,7 +1684,7 @@ async function renderPinned(opts = {}){
   }
   (p.sections || []).map((s, idx) => [s, idx])
     .filter(([s]) => ((s && s.tab) || '') === secTab)
-    // 本文に [チャート] と書いた行があるセクションは「望む結果を創り出す」タブ専用。
+    // 本文に [チャート] と書いた行があるセクションは「チャートを書く」タブ専用。
     // 基本情報タブには出さない（同じ説明が2箇所に出ないように）
     .filter(([s]) => /^\s*\[チャート\]\s*$/m.test(s.body || '') === fold)
     .forEach(([s, idx]) => {
@@ -1794,6 +1798,7 @@ function openInfoModal(){
   $('inf-sched').value = (p.schedule || []).join('\n');
   $('inf-note').value = p.note || '';
   $('inf-sgtitle').value = p.signup_title || '';
+  $('inf-tablabel').value = p.tab_label || '';
   // 道具の部屋（今日をつくる）は、画面に出るものだけ編集できるようにする
   const simple = room.kind === 'tool';
   document.querySelectorAll('#info-modal .inf-full').forEach(el => el.style.display = simple ? 'none' : '');
@@ -1808,7 +1813,9 @@ $('info-save').onclick = async () => {
     ['zoom','contacts','schedule','schedule_title','note','gcal'].forEach(k => delete pinned[k]);
     pinned.signup_title = $('inf-sgtitle').value.trim();
     if (!pinned.signup_title) delete pinned.signup_title;
-    if (await savePinned(pinned)) { $('info-modal').style.display = 'none'; toast('保存しました'); repaintPinned(); }
+    pinned.tab_label = $('inf-tablabel').value.trim();
+    if (!pinned.tab_label) delete pinned.tab_label;
+    if (await savePinned(pinned)) { $('info-modal').style.display = 'none'; toast('保存しました'); repaintPinned(); refreshTabLabel(); }
     return;
   }
   const zid = $('inf-zoom-id').value.trim(), zpass = $('inf-zoom-pass').value.trim(), zurl = $('inf-zoom-url').value.trim();
@@ -1822,6 +1829,8 @@ $('info-save').onclick = async () => {
   pinned.note = $('inf-note').value.trim();
   pinned.signup_title = $('inf-sgtitle').value.trim();
   if (!pinned.signup_title) delete pinned.signup_title;
+  pinned.tab_label = $('inf-tablabel').value.trim();
+  if (!pinned.tab_label) delete pinned.tab_label;
   pinned.gcal = $('inf-gcal').value.split(/[\n,]+/).map(l => {
     const m = l.match(/[?&]src=([^&\s]+)/);
     return (m ? decodeURIComponent(m[1]) : l).trim();
@@ -1831,9 +1840,14 @@ $('info-save').onclick = async () => {
   if (await savePinned(pinned)) {
     $('info-modal').style.display = 'none';
     toast('基本情報を保存しました');
-    repaintPinned();
+    repaintPinned(); refreshTabLabel();
   }
 };
+/* 保存直後に上のタブの文字だけ差し替える（画面全体は描き直さない） */
+function refreshTabLabel(){
+  const el = $('tabs').querySelector('.tab[data-tab="pinned"]');
+  if (el) el.textContent = S.current.room.pinned?.tab_label || t('基本情報');
+}
 
 /* ===== 紹介ページ（まだ入っていない人に見える文面）の編集 =====
    rooms.subtitle / about_what / about_how / next_intake / cta_url / cta_label を編集する。
