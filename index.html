@@ -1068,6 +1068,12 @@ async function start(){
       } else openTermsModal();
     }
     else if (S.firstVisit) openNameModal();
+    // メールの「今日のレッスンを読む」から来た人は 21 Lessons へ直行
+    if (location.hash === '#21lessons') {
+      const lr = S.rooms.find(r => isLessonsRoom(r));
+      if (lr && (isMember(lr.id) || canEdit(lr.id))) openLessonsRoom(lr);
+      try { history.replaceState(null, '', location.pathname); } catch(_){}
+    }
   } catch (e) {
     console.error(e);
     toast('データの読み込みに失敗しました。ページを再読み込みしてください。');
