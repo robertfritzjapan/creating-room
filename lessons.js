@@ -131,15 +131,22 @@ async function openRoomAbout(room){
       <button class="add-res-btn" style="margin:0" id="about-edit">✏️ 紹介ページを編集</button>
       <button class="ghost-btn" style="margin:0" id="about-back">部屋に戻る</button>
     </div>` : '';
+  // 「ここで何をするか」の1行目が写真の URL なら、部屋名の上に大きく出す（文面の中には出さない）
+  let what = room.about_what || '', hero = '';
+  const m = what.match(/^\s*(https?:\/\/\S+)\s*\n?/);
+  if (m && (/\.(png|jpe?g|gif|webp)(\?|#|$)/i.test(m[1]) || m[1].includes('/room-media/'))) {
+    hero = m[1]; what = what.slice(m[0].length).replace(/^\n+/, '');
+  }
   h += `<div class="card about-card">
+    ${hero ? `<img class="about-hero" src="${esc(hero)}" alt="" loading="lazy">` : ''}
     <h2 class="about-title">${esc(room.name)}</h2>
     ${room.subtitle ? `<p class="about-sub">${esc(room.subtitle)}</p>` : ''}
-    ${room.about_what ? `<div class="about-kv"><div class="k">ここで何をするか</div><div class="v">${richText(room.about_what)}</div></div>` : ''}
+    ${what ? `<div class="about-kv"><div class="k">ここで何をするか</div><div class="v">${richText(what)}</div></div>` : ''}
     ${room.about_how  ? `<div class="about-kv"><div class="k">入り方</div><div class="v">${richText(room.about_how)}</div></div>` : ''}
     ${!room.about_what && !room.about_how ? `<p class="muted">紹介文は準備中です。</p>` : ''}
   </div>`;
   if (vis === 'public') {
-    h += `<div class="card"><p style="font-size:13px;margin-bottom:12px">どなたでも入れます。</p><button class="primary-btn" id="about-join">参加する</button></div>`;
+    h += `<div class="card"><p style="font-size:16px;margin-bottom:12px">どなたでも入れます。</p><button class="primary-btn" id="about-join">参加する</button></div>`;
   } else if (openC.length) {
     h += openC.map(c => `
       <div class="card">
@@ -158,7 +165,7 @@ async function openRoomAbout(room){
   h += `<div class="card">
       <div class="${room.next_intake ? 'about-intake' : 'nocta'}">${room.next_intake ? richText(room.next_intake) : 'いまは募集していません'}</div>
     ${room.cta_url
-      ? `<a class="primary-btn" href="${esc(room.cta_url)}" target="_blank" rel="noopener">${esc(room.cta_label || '申し込む')}</a>`
+      ? `<a class="primary-btn" href="${esc(room.cta_url)}" target="_blank" rel="noopener">${esc(room.cta_label || '詳細を見る')}</a>`
          : room.next_intake ? '' : `<button class="ghost-btn" id="about-notify">募集が始まったら知らせる</button>`}
   </div>`;
 }
@@ -301,7 +308,7 @@ function openLessonsList(room, tab){
   S.current = { type:'room', room };
   $('room-title').textContent = room.name;
   updatePinBtn();
-  const tabs = [['series','シリーズ'],['pinned','基本情報']];
+  const tabs = [['series','シリーズ'],['pinned', room.pinned?.tab_label || '基本情報']];   // タブ名は部屋ごとに変えられる
   if (canEdit(room.id)) tabs.push(['cmembers','参加者・支払い確認']);
   if (canEdit(room.id) && L.queueCount) tabs.push(['queue',`未返信（${L.queueCount}）`]);
   if (roleIn(room.id) === 'admin') tabs.push(['members','権限']);
