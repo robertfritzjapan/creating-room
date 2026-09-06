@@ -1053,7 +1053,7 @@ async function start(){
     const sccp = S.rooms.find(x => x.slug === 'sccp');
     // メールの「今日のレッスンを読む」（#21lessons）から来た人は、他のどの振り分けよりも先に 21 Lessons へ
     const mailJump = location.hash === '#21lessons' ? S.rooms.find(r => isLessonsRoom(r) && (isMember(r.id) || canEdit(r.id))) : null;
-    if (mailJump) { openLessonsRoom(mailJump); try { history.replaceState(null, '', location.pathname); } catch(_){} }
+    if (mailJump) { openLessonsRoom(mailJump); }
     else if (isEN() && sccp && isMember(sccp.id)) { openRoom(sccp); showTab('archive'); }   // 英語モードは SCCP のクラス記録に直行
     else if (defRoom) openRoom(defRoom);
     else if (sccp && isMember(sccp.id)) openRoom(sccp);
