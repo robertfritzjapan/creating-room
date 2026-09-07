@@ -917,7 +917,7 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
 <div id="toast"></div>
 
 <script src="vendor/supabase.js"></script>
-<script src="lessons.js?v=3"></script>
+<script src="lessons.js?v=4"></script>
 <script>
 /* ================= 設定 ================= */
 if (!window.supabase) { document.getElementById('boot').textContent = '読み込みに失敗しました。再読み込みしてください。'; throw new Error('supabase-js not loaded'); }
@@ -1052,7 +1052,7 @@ async function start(){
     const defRoom = S.rooms.find(x => x.id === S.profile.default_room && isMember(x.id));
     const sccp = S.rooms.find(x => x.slug === 'sccp');
     // メールの「今日のレッスンを読む」（#21lessons）から来た人は、他のどの振り分けよりも先に 21 Lessons へ
-    const mailJump = location.hash === '#21lessons' ? S.rooms.find(r => isLessonsRoom(r) && (isMember(r.id) || canEdit(r.id))) : null;
+    const mailJump = location.hash === '#21lessons' ? S.rooms.find(r => isLessonsRoom(r) && isMember(r.id)) : null;
     if (mailJump) { openLessonsRoom(mailJump); }
     else if (isEN() && sccp && isMember(sccp.id)) { openRoom(sccp); showTab('archive'); }   // 英語モードは SCCP のクラス記録に直行
     else if (defRoom) openRoom(defRoom);
@@ -1090,10 +1090,23 @@ async function start(){
   }
 }
 
+/* ===== 権限（部屋ごと）=====
+   memberships.role（member / editor / admin）を「何ができるか」に翻訳するのは、この表だけ。
+   画面側は必ず can(roomId, '操作') で聞く（role 名を直接見ない）。
+   役割を増やしたいとき（例：クラス記録だけ触れる人）は、この表の該当する行に役割名を足すだけでよい。 */
+const PERMS = {
+  edit_sections:  ['editor','admin'],   // 基本情報のセクション・参加受付の編集
+  edit_archive:   ['editor','admin'],   // クラス記録の追加・編集
+  edit_resources: ['editor','admin'],   // RFC のツール（リソース）の追加・編集
+  moderate_tools: ['editor','admin'],   // みんなのツールを、自分の分でなくても編集・削除
+  delete_reviews: ['admin'],            // みんなのツールの感想を、自分の分でなくても削除
+  staff_inbox:    ['editor','admin'],   // なんでも窓口・質問を「事務局側」として見る・返す
+  edit_lessons:   ['editor','admin'],   // 21 Lessons：期・レッスン・参加者・未返信
+  manage_members: ['admin'],            // メンバー・権限タブ
+};
 const isMember = roomId => S.memberships.some(m => m.room_id === roomId);
 const roleIn   = roomId => S.memberships.find(m => m.room_id === roomId)?.role || null;
-const canEdit  = roomId => ['admin', 'editor'].includes(roleIn(roomId));
-const isRoomAdmin = roomId => roleIn(roomId) === 'admin';
+const can      = (roomId, action) => (PERMS[action] || []).includes(roleIn(roomId));
 
 /* ================= サイドバー ================= */
 function renderMe(){
@@ -1127,7 +1140,7 @@ function renderNav(){
   const roomRow = r => {
     const member = isMember(r.id);
     const open = !member && L.cohorts.some(c => c.room_id === r.id && c.status === 'open');
-    const unread = (isLessonsRoom(r) && canEdit(r.id) && L.queueCount) ? `<span class="nav-badge" data-queue-badge title="${t('未返信')}">${L.queueCount}</span>` : '';
+    const unread = (isLessonsRoom(r) && can(r.id, 'edit_lessons') && L.queueCount) ? `<span class="nav-badge" data-queue-badge title="${t('未返信')}">${L.queueCount}</span>` : '';
     const badge = unread || (open ? `<span class="nav-tag">${t('募集中')}</span>`
       : (!member && r.visibility === 'public') ? `<button class="join-mini" data-join="${r.id}">${t('参加')}</button>` : '');
     return `<div class="nav-item ${member ? '' : 'locked'}" data-nav="${r.id}"><span class="dot"></span><span class="nav-name">${esc(t(r.name))}${r.subtitle && !member ? `<span class="nav-sub">${esc(r.subtitle)}</span>` : ''}</span>${badge}</div>`;
@@ -1135,7 +1148,7 @@ function renderNav(){
   let h = `<div class="nav-label">${t('ホーム')}</div>
     <div class="nav-item" data-nav="home"><span class="dot"></span>${t('新着フィード')}</div>`;
   // なんでも窓口の⭕️：事務局には未返信の数、相談者には届いた返事の数（lessons.js の fetchInboxCount）
-  const inboxBadge = L.inboxCount ? `<span class="nav-badge" title="${canEdit(entrance?.id) ? t('未返信') : t('返事が届いています')}">${L.inboxCount}</span>` : '';
+  const inboxBadge = L.inboxCount ? `<span class="nav-badge" title="${can(entrance?.id, 'staff_inbox') ? t('未返信') : t('返事が届いています')}">${L.inboxCount}</span>` : '';
   if (entrance) h += `<div class="nav-item" data-nav="inbox"><span class="dot"></span><span class="nav-name">${t('なんでも窓口')}</span>${inboxBadge}</div>`;
   h += `<div class="nav-item" data-nav="pins"><span class="dot"></span>${t('ピンした場所')}</div>`;
   // Creating Way グループ：はじめる・ノート・Wayのクラスの部屋をひとまとめ
@@ -1227,7 +1240,7 @@ function openRoom(room){
     : (navGroupOf(room) === 'class' || navGroupOf(room) === 'workshop')   // Wayのクラスと単発ワークショップはクラス記録なし
     ? [['pinned','基本情報'],...(showChat ? [['chat','質問']] : []),['resources','リソース']]
     : [['pinned','基本情報'],['archive','クラス記録'],...(showChat ? [['chat','質問']] : []),['resources','リソース']];
-  if (roleIn(room.id) === 'admin') tabs.push(['members','メンバー']);   // 管理者だけ。entrance では「誰がここまで来ているか」の一覧になる
+  if (can(room.id, 'manage_members')) tabs.push(['members','メンバー']);   // 管理者だけ。entrance では「誰がここまで来ているか」の一覧になる
   // 「基本情報」タブの名前は部屋ごとに変えられる（基本情報を編集 → タブの名前）
   const tabLabel = room.pinned?.tab_label;
   $('tabs').innerHTML = tabs.map(([k,label]) =>
@@ -1612,7 +1625,7 @@ function richCopy(body){
 async function renderPinned(opts = {}){
   const room = S.current.room;
   const p = room.pinned || {};
-  const editor = canEdit(room.id);
+  const editor = can(room.id, 'edit_sections');
   const fold = !!opts.fold;   // true のとき、セクションを折りたたみ（Creating ノートのチャート画面）
   const secTab = opts.secTab || '';   // '' = 基本情報 / 'session' = 体験セッション
   const bare = !!secTab;              // 体験セッションには Zoom・受付・カレンダーを出さない
@@ -2012,7 +2025,7 @@ function drawArchive(){
   const types = ['すべて', ...new Set(S.videos.map(v => v.class_type))];
   const tt = x => x === 'すべて' ? t('すべて') : x;
   const q = S.videoSearch.trim().toLowerCase();
-  const editor = canEdit(S.current.room.id);
+  const editor = can(S.current.room.id, 'edit_archive');
   const list = S.videos.filter(v =>
     (S.videoFilter === 'すべて' || v.class_type === S.videoFilter) &&
     (!q || (v.title + ' ' + (v.description||'') + ' ' + (v.assignment||'') + ' ' + (v.title_en||'') + ' ' + (v.description_en||'') + ' ' + (v.assignment_en||'')).toLowerCase().includes(q)))
@@ -2105,7 +2118,7 @@ async function renderChat(){
   leaveChat();
   $('page').innerHTML = `<div class="empty">読み込み中…</div>`;
   const roomId = S.current.room.id;
-  const isAdmin = canEdit(roomId);   // 事務局側＝管理者と編集者（RFC スタッフ）
+  const isAdmin = can(roomId, 'staff_inbox');   // 事務局側＝管理者と編集者（RFC スタッフ）
 
   let q = supa.from('inquiries').select('*').eq('room_id', roomId);
   if (!isAdmin) q = q.eq('user_id', S.user.id);
@@ -2192,7 +2205,7 @@ async function renderChat(){
 }
 
 /* ===== リソース ===== */
-function toolCardHtml(t, reviewsByTool, isEditor){
+function toolCardHtml(t, reviewsByTool, moderator){
   const revs = reviewsByTool[t.id] || [];
   const authorName = S.profilesCache[t.created_by] || '…';
   const atts = (t.attachments && t.attachments.length) ? t.attachments
@@ -2207,7 +2220,7 @@ function toolCardHtml(t, reviewsByTool, isEditor){
         <div class="tool-name">${esc(t.name)}</div>
         <div class="tool-by">${esc(authorName)}が追加</div>
       </div>
-      ${(isEditor || t.created_by === S.user.id) ? `<span class="tool-actions"><button class="res-del" data-tedit="${t.id}" title="編集">✏️</button><button class="res-del" data-tdel="${t.id}" title="削除">✕</button></span>` : ''}
+      ${(moderator || t.created_by === S.user.id) ? `<span class="tool-actions"><button class="res-del" data-tedit="${t.id}" title="編集">✏️</button><button class="res-del" data-tdel="${t.id}" title="削除">✕</button></span>` : ''}
     </div>
     ${t.description ? `<div class="tool-desc">${esc(t.description)}</div>` : ''}
     ${t.content ? `<div class="tool-text"><button class="copy-btn" data-copy="${t.id}">📋 コピー</button><pre>${esc(t.content)}</pre></div>` : ''}
@@ -2225,7 +2238,7 @@ function toolCardHtml(t, reviewsByTool, isEditor){
 function reviewHtml(r){
   const name = S.profilesCache[r.user_id] || '…';
   const mine = r.user_id === S.user.id;
-  const canDel = mine || isRoomAdmin(S.current.room.id);
+  const canDel = mine || can(S.current.room.id, 'delete_reviews');
   return `<div class="tool-review" data-review="${r.id}">
     <div class="tool-review-head"><b>${esc(name)}</b><span>${fmtTime(r.created_at)}</span>${canDel ? `<button class="res-del" data-rdel="${r.id}" title="削除">✕</button>` : ''}</div>
     <div class="tool-review-body">${esc(r.body)}</div>
@@ -2249,14 +2262,15 @@ async function renderResources(){
   const reviewsByTool = {};
   reviews.forEach(r => (reviewsByTool[r.tool_id] = reviewsByTool[r.tool_id] || []).push(r));
 
-  const isEditor = canEdit(roomId);
+  const isEditor = can(roomId, 'edit_resources');
+  const moderator = can(roomId, 'moderate_tools');
   S.toolsCache = toolData || [];
   const toolAddBtn = `<button class="add-res-btn" id="add-tool">＋ ツールを追加</button>`;
   const noTools = isEntranceRoom(S.current.room) || isNoteRoom(S.current.room) || ['class','workshop'].includes(navGroupOf(S.current.room));   // 道の案内・ノート・Wayのクラス・ワークショップには「みんなのツール」を出さない
   const toolSection = noTools ? '' : `<div class="card tool-section"><h3><span class="bar"></span>🛠 みんなのツール<span class="tool-badge">投稿大歓迎</span></h3>
     <p class="tool-note">ここはメンバーのみなさんが参加できるコーナーです。ツールの登録も、使ってみた感想（使い手の声）の投稿も、自由にどうぞ。</p>
     ${toolAddBtn}
-    ${S.toolsCache.length ? S.toolsCache.map(t => toolCardHtml(t, reviewsByTool, isEditor)).join('') : `<div class="empty">まだツールはありません</div>`}
+    ${S.toolsCache.length ? S.toolsCache.map(t => toolCardHtml(t, reviewsByTool, moderator)).join('') : `<div class="empty">まだツールはありません</div>`}
   </div>`;
 
   S.resCache = resData || [];
