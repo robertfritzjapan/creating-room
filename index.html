@@ -956,7 +956,7 @@ const EN = {
   'なんでも窓口':'Ask anything','はじめる':'Start here','Creating ノート':'Creating Note',
   '体験セッション':'Trial sessions','チャートを書く':'Write your chart',
   '管理者':'Admin','編集者':'Editor','メンバー':'Member','未所属':'—',
-  '基本情報':'Info','クラス記録':'Class records','実践ツール':'Practice tools','みんなのツール':'Member tools','学びの機会':'Learning opportunities','質問':'Questions','リソース':'Resources','シリーズ':'Series','Creatingノート':'Creating Note','今日をつくる':'Create Today',
+  '基本情報':'Info','クラス記録':'Class records','ツール':'Tools','実践ツール':'Practice tools','みんなのツール':'Member tools','学びの機会':'Learning opportunities','質問':'Questions','リソース':'Resources','シリーズ':'Series','Creatingノート':'Creating Note','今日をつくる':'Create Today',
   '参加者・支払い確認':'Participants','権限':'Roles',
   '📔 はじめかた':'📔 Getting started','はじめかた':'Getting started',
   '構造コンサルタント認定（SCCP）':'SCCP – Structural Consultant Certification','フリッツ・ビジネススクール':'Fritz Business School',
@@ -1112,7 +1112,7 @@ const NAV_GROUPS = [['together','みんなとつくる'],['workshop','ワーク�
 const NAV_KEYS = ['class','together','workshop'];
 const isNoteRoom = r => !!r && r.kind === 'tool';                                     // Creating ノート（緊張構造チャートの部屋）
 const isEntranceRoom = r => !!r && r.slug === 'entrance';                             // Creating Wayをはじめる
-/* ツールの部屋（FST・MMOT・Sales …）：基本情報／実践ツール／みんなのツール の3タブ構成。
+/* ツールの部屋（FST・MMOT・Sales …）：基本情報／ツール の構成（「ツール」タブの中に RFC のツールとみんなのツールを上下に並べる）。
    同じ構造の部屋を増やすときは、slug をここに足すか、その部屋の pinned に {"layout":"tools"} を入れる */
 const TOOL_ROOM_SLUGS = ['fst', 'mmot', 'sales'];
 const isToolRoom = r => !!r && (TOOL_ROOM_SLUGS.includes(r.slug) || r.pinned?.layout === 'tools');
@@ -1219,7 +1219,7 @@ function openRoom(room){
   // 質問は「なんでも窓口」に一本化した。回ごとに質問が要る 21 Lessons だけ、部屋の中に残す。
   const showChat = room.slug === 'lessons21';
   const tabs = isToolRoom(room)   // FST・MMOT・Sales の部屋：ツール置き場＋学びの機会の拠点
-    ? [['pinned','基本情報'],['resources','実践ツール'],['tools','みんなのツール']]
+    ? [['pinned','基本情報'],['resources','ツール']]
     : isEntranceRoom(room)
     ? [['pinned','基本情報'],['session','体験セッション'],['resources','リソース']]
     : isNoteRoom(room)
@@ -2287,9 +2287,8 @@ async function renderResources(){
       </div>`).join('');
   }
 
-  // ツールの部屋（FST・MMOT・Sales）は「実践ツール」と「みんなのツール」を別タブに分ける
-  const splitTabs = isToolRoom(S.current.room);
-  $('page').innerHTML = S.tab === 'tools' ? toolSection : (splitTabs ? resSection : resSection + toolSection);
+  // ツールの部屋（FST・MMOT・Sales）も他の部屋も同じ：上に RFC のツール（リソース）、下に「みんなのツール」
+  $('page').innerHTML = resSection + toolSection;
   bindCopyBoxes($('page'));
 
   const atb = $('add-tool');
