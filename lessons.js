@@ -24,7 +24,7 @@ const cohortRoom = c => S.rooms.find(r => r.id === c.room_id);
 const myCMFor = cohortId => L.myCM.find(m => m.cohort_id === cohortId);
 const isPaidFor = cohortId => !!myCMFor(cohortId)?.paid_at;
 const isInCohort = cohortId => !!myCMFor(cohortId);   // 申し込んだ時点で読める（入金確認は別）
-const canEditCohort = c => !!c && canEdit(c.room_id);
+const canEditCohort = c => !!c && can(c.room_id, 'edit_lessons');
 const fmtDateJ = iso => iso ? new Date(iso).toLocaleDateString('ja-JP', { timeZone:'Asia/Tokyo', year:'numeric', month:'long', day:'numeric' }) : '';
 const fmtWhen = iso => {
   if (!iso) return '';
@@ -43,12 +43,12 @@ async function lessonsBootstrap(){
   ]);
   L.cohorts = c.data || [];
   L.myCM = m.data || [];
-  L.editorRooms = S.memberships.filter(x => ['admin','editor'].includes(x.role)).map(x => x.room_id);
+  L.editorRooms = S.memberships.filter(x => PERMS.edit_lessons.includes(x.role)).map(x => x.room_id);
   L.postDraft = null;
   if (editorOfLessons()) refreshQueueCount(); else refreshActivityCount();
   refreshInboxCount();
 }
-const editorOfLessons = () => S.rooms.some(r => isLessonsRoom(r) && canEdit(r.id));
+const editorOfLessons = () => S.rooms.some(r => isLessonsRoom(r) && can(r.id, 'edit_lessons'));
 const editorCohorts = () => L.cohorts.filter(c => canEditCohort(c));
 
 async function refreshQueueCount(){
@@ -124,29 +124,22 @@ async function openRoomAbout(room){
   highlightNav();
   const openC = L.cohorts.filter(c => c.room_id === room.id && c.status === 'open');
   const vis = room.visibility || 'invite';
-  const editor = canEdit(room.id);
+  const editor = can(room.id, 'edit_lessons');
   // 編集者がプレビューで開いたとき：これは「まだ入っていない人」に見える画面だと分かるようにし、編集と戻るを出す
   let h = editor ? `<div class="card" style="background:#faf9f8;display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:14px 18px">
       <span class="muted" style="flex:1;min-width:180px">👀 この画面は、まだ入っていない人に見える紹介ページです</span>
       <button class="add-res-btn" style="margin:0" id="about-edit">✏️ 紹介ページを編集</button>
       <button class="ghost-btn" style="margin:0" id="about-back">部屋に戻る</button>
     </div>` : '';
-  // 「ここで何をするか」の1行目が写真の URL なら、部屋名の上に大きく出す（文面の中には出さない）
-  let what = room.about_what || '', hero = '';
-  const m = what.match(/^\s*(https?:\/\/\S+)\s*\n?/);
-  if (m && (/\.(png|jpe?g|gif|webp)(\?|#|$)/i.test(m[1]) || m[1].includes('/room-media/'))) {
-    hero = m[1]; what = what.slice(m[0].length).replace(/^\n+/, '');
-  }
   h += `<div class="card about-card">
-    ${hero ? `<img class="about-hero" src="${esc(hero)}" alt="" loading="lazy">` : ''}
     <h2 class="about-title">${esc(room.name)}</h2>
     ${room.subtitle ? `<p class="about-sub">${esc(room.subtitle)}</p>` : ''}
-    ${what ? `<div class="about-kv"><div class="k">ここで何をするか</div><div class="v">${richText(what)}</div></div>` : ''}
+    ${room.about_what ? `<div class="about-kv"><div class="k">ここで何をするか</div><div class="v">${richText(room.about_what)}</div></div>` : ''}
     ${room.about_how  ? `<div class="about-kv"><div class="k">入り方</div><div class="v">${richText(room.about_how)}</div></div>` : ''}
     ${!room.about_what && !room.about_how ? `<p class="muted">紹介文は準備中です。</p>` : ''}
   </div>`;
   if (vis === 'public') {
-    h += `<div class="card"><p style="font-size:16px;margin-bottom:12px">どなたでも入れます。</p><button class="primary-btn" id="about-join">参加する</button></div>`;
+    h += `<div class="card"><p style="font-size:13px;margin-bottom:12px">どなたでも入れます。</p><button class="primary-btn" id="about-join">参加する</button></div>`;
   } else if (openC.length) {
     h += openC.map(c => `
       <div class="card">
@@ -165,7 +158,7 @@ async function openRoomAbout(room){
   h += `<div class="card">
       <div class="${room.next_intake ? 'about-intake' : 'nocta'}">${room.next_intake ? richText(room.next_intake) : 'いまは募集していません'}</div>
     ${room.cta_url
-      ? `<a class="primary-btn" href="${esc(room.cta_url)}" target="_blank" rel="noopener">${esc(room.cta_label || '詳細を見る')}</a>`
+      ? `<a class="primary-btn" href="${esc(room.cta_url)}" target="_blank" rel="noopener">${esc(room.cta_label || '申し込む')}</a>`
          : room.next_intake ? '' : `<button class="ghost-btn" id="about-notify">募集が始まったら知らせる</button>`}
   </div>`;
 }
@@ -277,7 +270,7 @@ async function joinCohort(cohortId, room){
     supa.from('cohort_members').select('*').eq('user_id', S.user.id),
   ]);
   S.memberships = ms || S.memberships; L.myCM = cm || L.myCM;
-  L.editorRooms = S.memberships.filter(x => ['admin','editor'].includes(x.role)).map(x => x.room_id);
+  L.editorRooms = S.memberships.filter(x => PERMS.edit_lessons.includes(x.role)).map(x => x.room_id);
   renderNav(); renderMe();
   if (c?.payment_url) { window.open(c.payment_url, '_blank', 'noopener'); toast('参加を受け付けました。お支払いページを開きました'); }
   else toast('参加を受け付けました。レッスンはもう読めます');
@@ -293,7 +286,7 @@ async function joinCohort(cohortId, room){
    それ以外（期が複数・まだ始まっていない・期に入っていない）は、これまで通りの一覧。 */
 async function openLessonsRoom(room, tab){
   if (!tab) {
-    if (canEdit(room.id)) {
+    if (can(room.id, 'edit_lessons')) {
       if (L.queueCount && await openNextUnanswered()) return;
     } else {
       const mine = L.cohorts.filter(c => c.room_id === room.id && myCMFor(c.id) && c.status !== 'past');
@@ -308,10 +301,10 @@ function openLessonsList(room, tab){
   S.current = { type:'room', room };
   $('room-title').textContent = room.name;
   updatePinBtn();
-  const tabs = [['series','シリーズ'],['pinned', room.pinned?.tab_label || '基本情報']];   // タブ名は部屋ごとに変えられる
-  if (canEdit(room.id)) tabs.push(['cmembers','参加者・支払い確認']);
-  if (canEdit(room.id) && L.queueCount) tabs.push(['queue',`未返信（${L.queueCount}）`]);
-  if (roleIn(room.id) === 'admin') tabs.push(['members','権限']);
+  const tabs = [['series','シリーズ'],['pinned','基本情報']];
+  if (can(room.id, 'edit_lessons')) tabs.push(['cmembers','参加者・支払い確認']);
+  if (can(room.id, 'edit_lessons') && L.queueCount) tabs.push(['queue',`未返信（${L.queueCount}）`]);
+  if (can(room.id, 'manage_members')) tabs.push(['members','権限']);
   $('tabs').innerHTML = tabs.map(([k,label]) => `<div class="tab" data-tab="${k}">${t(label)}</div>`).join('');
   $('tabs').querySelectorAll('.tab').forEach(el => el.onclick = () => showLessonsTab(el.dataset.tab));
   highlightNav();
@@ -325,7 +318,7 @@ function showLessonsTab(tab){
 }
 async function renderSeries(){
   const room = S.current.room;
-  const editor = canEdit(room.id);
+  const editor = can(room.id, 'edit_lessons');
   const rc = L.cohorts.filter(c => c.room_id === room.id);
   const mine = rc.filter(c => myCMFor(c.id) || editor);
   const g = { active:[], open:[], past:[], draft:[] };
@@ -678,9 +671,9 @@ async function togglePin(type, id){
 const _editorsCache = {};
 async function editorIdsFor(roomId){
   if (_editorsCache[roomId]) return _editorsCache[roomId];
-  const { data } = await supa.from('memberships').select('user_id, role').eq('room_id', roomId).in('role', ['editor','admin']);
+  const { data } = await supa.from('memberships').select('user_id, role').eq('room_id', roomId).in('role', PERMS.edit_lessons);
   const ids = (data || []).map(x => x.user_id);
-  if (!ids.length && canEdit(roomId)) ids.push(S.user.id);
+  if (!ids.length && can(roomId, 'edit_lessons')) ids.push(S.user.id);
   _editorsCache[roomId] = ids;
   return ids;
 }
@@ -1178,7 +1171,7 @@ async function refreshActivityCount(){
 async function fetchInboxCount(){
   const entrance = S.rooms.find(r => r.slug === 'entrance');
   if (!entrance || !isMember(entrance.id)) return 0;
-  const admin = canEdit(entrance.id);
+  const admin = can(entrance.id, 'staff_inbox');
   let q = supa.from('inquiries').select('id, user_id, status, user_seen_at').eq('room_id', entrance.id);
   if (!admin) q = q.eq('user_id', S.user.id);
   const { data: inqs } = await q;
