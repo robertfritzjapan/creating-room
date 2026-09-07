@@ -137,6 +137,8 @@ a{color:var(--ai)}
 .msg-head b{font-weight:600}
 .msg-head span{color:var(--gray);font-size:11px;margin-left:8px}
 .msg-text{font-size:14.5px;background:var(--washi);border:1px solid var(--line);border-radius:0 12px 12px 12px;padding:9px 13px;display:inline-block;max-width:92%;white-space:pre-wrap;word-break:break-word}
+.msg.msg-reply{margin-left:44px}
+.msg.msg-reply.mine{margin-left:0;margin-right:44px}
 .msg.mine{flex-direction:row-reverse}
 .msg.mine .msg-body{display:flex;flex-direction:column;align-items:flex-end}
 .msg.mine .msg-head span{margin-left:0;margin-right:8px}
@@ -665,6 +667,8 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
     </div>
     <label class="form-label">「基本情報」タブの名前（任意）</label>
     <input class="form-input" id="inf-tablabel" placeholder="空欄なら「基本情報」　例：はじめに、ご案内、この部屋について">
+    <div class="inf-chat"><label class="form-label">チャットの先頭に出す一言（任意）</label>
+    <textarea class="form-input" id="inf-chatintro" rows="2" placeholder="例：ここは MMOT の練習相手を探したり、やってみた感想を話す場所です"></textarea></div>
     <label class="form-label">受付の見出し（任意）</label>
     <input class="form-input" id="inf-sgtitle" placeholder="空欄なら「参加希望の受付」　例：ミニレクチャー参加の受付">
     <div class="inf-full">
@@ -917,7 +921,8 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
 <div id="toast"></div>
 
 <script src="vendor/supabase.js"></script>
-<script src="lessons.js?v=4"></script>
+<script src="chat.js?v=1"></script>
+<script src="lessons.js?v=5"></script>
 <script>
 /* ================= 設定 ================= */
 if (!window.supabase) { document.getElementById('boot').textContent = '読み込みに失敗しました。再読み込みしてください。'; throw new Error('supabase-js not loaded'); }
@@ -956,7 +961,7 @@ const EN = {
   'なんでも窓口':'Ask anything','はじめる':'Start here','Creating ノート':'Creating Note',
   '体験セッション':'Trial sessions','チャートを書く':'Write your chart',
   '管理者':'Admin','編集者':'Editor','メンバー':'Member','未所属':'—',
-  '基本情報':'Info','クラス記録':'Class records','ツール':'Tools','実践ツール':'Practice tools','みんなのツール':'Member tools','学びの機会':'Learning opportunities','質問':'Questions','リソース':'Resources','シリーズ':'Series','Creatingノート':'Creating Note','今日をつくる':'Create Today',
+  '基本情報':'Info','クラス記録':'Class records','ツール':'Tools','チャット':'Chat','実践ツール':'Practice tools','みんなのツール':'Member tools','学びの機会':'Learning opportunities','質問':'Questions','リソース':'Resources','シリーズ':'Series','Creatingノート':'Creating Note','今日をつくる':'Create Today',
   '参加者・支払い確認':'Participants','権限':'Roles',
   '📔 はじめかた':'📔 Getting started','はじめかた':'Getting started',
   '構造コンサルタント認定（SCCP）':'SCCP – Structural Consultant Certification','フリッツ・ビジネススクール':'Fritz Business School',
@@ -1049,6 +1054,7 @@ async function start(){
     }
     await lessonsBootstrap();   // 21 Lessons：期と自分の参加を読む（lessons.js）
     renderMe(); renderNav();
+    refreshChatUnread();        // 部屋チャットの未読⭕️（chat.js）。待たずに進む
     const defRoom = S.rooms.find(x => x.id === S.profile.default_room && isMember(x.id));
     const sccp = S.rooms.find(x => x.slug === 'sccp');
     // メールの「今日のレッスンを読む」（#21lessons）から来た人は、他のどの振り分けよりも先に 21 Lessons へ
@@ -1100,6 +1106,7 @@ const PERMS = {
   edit_resources: ['editor','admin'],   // RFC のツール（リソース）の追加・編集
   moderate_tools: ['editor','admin'],   // みんなのツールを、自分の分でなくても編集・削除
   delete_reviews: ['admin'],            // みんなのツールの感想を、自分の分でなくても削除
+  moderate_chat:  ['editor','admin'],   // 部屋のチャットの投稿を、自分の分でなくても削除
   staff_inbox:    ['editor','admin'],   // なんでも窓口・質問を「事務局側」として見る・返す
   edit_lessons:   ['editor','admin'],   // 21 Lessons：期・レッスン・参加者・未返信
   manage_members: ['admin'],            // メンバー・権限タブ
@@ -1125,7 +1132,7 @@ const NAV_GROUPS = [['together','みんなとつくる'],['workshop','ワーク�
 const NAV_KEYS = ['class','together','workshop'];
 const isNoteRoom = r => !!r && r.kind === 'tool';                                     // Creating ノート（緊張構造チャートの部屋）
 const isEntranceRoom = r => !!r && r.slug === 'entrance';                             // Creating Wayをはじめる
-/* ツールの部屋（FST・MMOT・Sales …）：基本情報／ツール の構成（「ツール」タブの中に RFC のツールとみんなのツールを上下に並べる）。
+/* ツールの部屋（FST・MMOT・Sales …）：基本情報／チャット／ツール の構成（「ツール」タブの中に RFC のツールとみんなのツールを上下に並べる）。
    同じ構造の部屋を増やすときは、slug をここに足すか、その部屋の pinned に {"layout":"tools"} を入れる */
 const TOOL_ROOM_SLUGS = ['fst', 'mmot', 'sales'];
 const isToolRoom = r => !!r && (TOOL_ROOM_SLUGS.includes(r.slug) || r.pinned?.layout === 'tools');
@@ -1141,7 +1148,8 @@ function renderNav(){
     const member = isMember(r.id);
     const open = !member && L.cohorts.some(c => c.room_id === r.id && c.status === 'open');
     const unread = (isLessonsRoom(r) && can(r.id, 'edit_lessons') && L.queueCount) ? `<span class="nav-badge" data-queue-badge title="${t('未返信')}">${L.queueCount}</span>` : '';
-    const badge = unread || (open ? `<span class="nav-tag">${t('募集中')}</span>`
+    const chatNew = (member && S.chatUnread?.[r.id]) ? `<span class="nav-badge" title="${t('チャット')}">${S.chatUnread[r.id]}</span>` : '';   // 部屋チャットの未読（chat.js）
+    const badge = unread || chatNew || (open ? `<span class="nav-tag">${t('募集中')}</span>`
       : (!member && r.visibility === 'public') ? `<button class="join-mini" data-join="${r.id}">${t('参加')}</button>` : '');
     return `<div class="nav-item ${member ? '' : 'locked'}" data-nav="${r.id}"><span class="dot"></span><span class="nav-name">${esc(t(r.name))}${r.subtitle && !member ? `<span class="nav-sub">${esc(r.subtitle)}</span>` : ''}</span>${badge}</div>`;
   };
@@ -1232,7 +1240,7 @@ function openRoom(room){
   // 質問は「なんでも窓口」に一本化した。回ごとに質問が要る 21 Lessons だけ、部屋の中に残す。
   const showChat = room.slug === 'lessons21';
   const tabs = isToolRoom(room)   // FST・MMOT・Sales の部屋：ツール置き場＋学びの機会の拠点
-    ? [['pinned','基本情報'],['resources','ツール']]
+    ? [['pinned','基本情報'],['roomchat','チャット'],['resources','ツール']]
     : isEntranceRoom(room)
     ? [['pinned','基本情報'],['session','体験セッション'],['resources','リソース']]
     : isNoteRoom(room)
@@ -1267,13 +1275,13 @@ function openInbox(){
 
 /* 紹介ページ・21 Lessons の中身は lessons.js にあります */
 function showTab(tab){
-  if (S.tab === 'chat' && tab !== 'chat') leaveChat();
+  leaveChat();   // チャット系のタブから離れるとき、Realtime の購読を止める（何もなければ何もしない）
   S.tab = tab;
   $('tabs').querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
   if (S.current.host) { S.current = { type:'room', room: S.current.host }; }
   if (tab === 'chart') { renderNote(true); return; }              // Creating ノート：チャートを書く画面
   if (tab === 'session') { renderPinned({ secTab:'session' }); return; }   // 体験セッション／学びの機会
-  ({pinned:renderPinned, archive:renderArchive, chat:renderChat, resources:renderResources, tools:renderResources, members:renderMembers})[tab]();
+  ({pinned:renderPinned, archive:renderArchive, chat:renderChat, roomchat:renderRoomChat, resources:renderResources, tools:renderResources, members:renderMembers})[tab]();
 }
 
 /* ===== ファイルアップロード共通（テキスト系は文字コードを明示して文字化けを防ぐ） ===== */
@@ -1819,6 +1827,8 @@ function openInfoModal(){
   $('inf-note').value = p.note || '';
   $('inf-sgtitle').value = p.signup_title || '';
   $('inf-tablabel').value = p.tab_label || '';
+  $('inf-chatintro').value = p.chat_intro || '';
+  document.querySelectorAll('#info-modal .inf-chat').forEach(el => el.style.display = isToolRoom(room) ? '' : 'none');   // チャットがある部屋だけ
   // 道具の部屋（今日をつくる）は、画面に出るものだけ編集できるようにする
   const simple = room.kind === 'tool';
   document.querySelectorAll('#info-modal .inf-full').forEach(el => el.style.display = simple ? 'none' : '');
@@ -1851,6 +1861,8 @@ $('info-save').onclick = async () => {
   if (!pinned.signup_title) delete pinned.signup_title;
   pinned.tab_label = $('inf-tablabel').value.trim();
   if (!pinned.tab_label) delete pinned.tab_label;
+  pinned.chat_intro = $('inf-chatintro').value.trim();
+  if (!pinned.chat_intro) delete pinned.chat_intro;
   pinned.gcal = $('inf-gcal').value.split(/[\n,]+/).map(l => {
     const m = l.match(/[?&]src=([^&\s]+)/);
     return (m ? decodeURIComponent(m[1]) : l).trim();
