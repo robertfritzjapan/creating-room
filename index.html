@@ -241,6 +241,9 @@ a{color:var(--ai)}
 .feed-body{flex:1;min-width:0}
 .feed-meta{font-size:13.5px;color:var(--gray);margin-bottom:2px}
 .feed-meta b{color:var(--ai);font-weight:600}
+.feed-title{font-size:16px;font-weight:600;margin:2px 0 4px}
+.feed-ann .feed-text{font-size:15px;line-height:1.7}
+.feed-banner{background:var(--ai-soft);color:var(--ai);font-size:14px;padding:9px 20px;cursor:pointer;border-bottom:1px solid var(--line)}
 .room-chip{display:inline-block;font-size:10px;padding:1px 8px;border-radius:20px;background:var(--ai-soft);color:var(--ai);margin-left:6px;letter-spacing:.05em}
 .feed-text{font-size:15.5px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 
@@ -629,6 +632,7 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
       <button class="pin-btn" id="pin-btn" style="display:none" title="この画面をログイン後の初期表示にする">★</button>
       <div class="tabs" id="tabs"></div>
     </div>
+    <div class="feed-banner" id="feed-banner" hidden onclick="openHome()"></div>
     <div class="content"><div class="page" id="page"></div></div>
   </div>
 </div>
@@ -866,6 +870,21 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
   </div>
 </div>
 
+<!-- ===== お知らせを書く（新着フィード・feed.js） ===== -->
+<div class="modal-bg" id="ann-modal">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:460px">
+    <h3>お知らせを書く</h3>
+    <p class="sub">新着フィードに出ます。宛先の部屋のメンバーだけに見えます。</p>
+    <label class="form-label">宛先</label>
+    <select class="form-input" id="ann-room"></select>
+    <label class="form-label">タイトル（1行）</label>
+    <input class="form-input" id="ann-title" placeholder="例：11月のリトリート、受付を始めました" maxlength="80">
+    <label class="form-label">本文（2〜3行程度。**太字** とリンクが使えます）</label>
+    <textarea class="form-input" id="ann-body" rows="4"></textarea>
+    <button class="primary-btn" style="margin-top:14px" id="ann-save">出す</button>
+  </div>
+</div>
+
 <div class="modal-bg" id="name-modal">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:380px">
     <h3>なんとお呼びしましょう</h3>
@@ -922,6 +941,7 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
 
 <script src="vendor/supabase.js"></script>
 <script src="chat.js?v=1"></script>
+<script src="feed.js?v=1"></script>
 <script src="lessons.js?v=5"></script>
 <script>
 /* ================= 設定 ================= */
@@ -1055,11 +1075,13 @@ async function start(){
     await lessonsBootstrap();   // 21 Lessons：期と自分の参加を読む（lessons.js）
     renderMe(); renderNav();
     refreshChatUnread();        // 部屋チャットの未読⭕️（chat.js）。待たずに進む
+    refreshFeedUnread();        // 新着フィードの未読（feed.js）。待たずに進む
     const defRoom = S.rooms.find(x => x.id === S.profile.default_room && isMember(x.id));
     const sccp = S.rooms.find(x => x.slug === 'sccp');
     // メールの「今日のレッスンを読む」（#21lessons）から来た人は、他のどの振り分けよりも先に 21 Lessons へ
     const mailJump = location.hash === '#21lessons' ? S.rooms.find(r => isLessonsRoom(r) && isMember(r.id)) : null;
     if (mailJump) { openLessonsRoom(mailJump); }
+    else if (location.hash === '#inbox') openInbox();   // 通知メールの「なんでも窓口」リンクから
     else if (isEN() && sccp && isMember(sccp.id)) { openRoom(sccp); showTab('archive'); }   // 英語モードは SCCP のクラス記録に直行
     else if (defRoom) openRoom(defRoom);
     else if (sccp && isMember(sccp.id)) openRoom(sccp);
@@ -1109,6 +1131,8 @@ const PERMS = {
   moderate_chat:  ['editor','admin'],   // 部屋のチャットの投稿を、自分の分でなくても削除
   staff_inbox:    ['editor','admin'],   // なんでも窓口・質問を「事務局側」として見る・返す
   edit_lessons:   ['editor','admin'],   // 21 Lessons：期・レッスン・参加者・未返信
+  post_announcement: ['editor','admin'],// 新着フィードに、その部屋のメンバー向けのお知らせを出す
+  announce_all:   ['admin'],            // 新着フィードに、ログインしている全員向けのお知らせ（メンバー限定・早耳ニュース）を出す
   manage_members: ['admin'],            // メンバー・権限タブ
 };
 const isMember = roomId => S.memberships.some(m => m.room_id === roomId);
@@ -1154,7 +1178,7 @@ function renderNav(){
     return `<div class="nav-item ${member ? '' : 'locked'}" data-nav="${r.id}"><span class="dot"></span><span class="nav-name">${esc(t(r.name))}${r.subtitle && !member ? `<span class="nav-sub">${esc(r.subtitle)}</span>` : ''}</span>${badge}</div>`;
   };
   let h = `<div class="nav-label">${t('ホーム')}</div>
-    <div class="nav-item" data-nav="home"><span class="dot"></span>${t('新着フィード')}</div>`;
+    <div class="nav-item" data-nav="home"><span class="dot"></span>${t('新着フィード')}${S.feedUnread ? `<span class="nav-badge" title="${t('新着')}">${S.feedUnread}</span>` : ''}</div>`;
   // なんでも窓口の⭕️：事務局には未返信の数、相談者には届いた返事の数（lessons.js の fetchInboxCount）
   const inboxBadge = L.inboxCount ? `<span class="nav-badge" title="${can(entrance?.id, 'staff_inbox') ? t('未返信') : t('返事が届いています')}">${L.inboxCount}</span>` : '';
   if (entrance) h += `<div class="nav-item" data-nav="inbox"><span class="dot"></span><span class="nav-name">${t('なんでも窓口')}</span>${inboxBadge}</div>`;
@@ -1191,6 +1215,7 @@ function highlightNav(){
   const t = S.current?.type;
   const key = t === 'home' ? 'home' : t === 'inbox' ? 'inbox' : t === 'pins' ? 'pins' : t === 'queue' ? 'queue' : t === 'post' ? 'post' : (S.current?.host?.id || S.current?.room?.id);
   $('nav').querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.nav === key));
+  if (typeof updateFeedBanner === 'function') updateFeedBanner();   // 未読のお知らせの一行（feed.js）
 }
 async function joinPublicRoom(roomId){
   const { error } = await supa.from('memberships').insert({ user_id: S.user.id, room_id: roomId, role: 'member' });
@@ -2099,6 +2124,9 @@ async function ensureNames(userIds){
   const { data } = await supa.from('profiles').select('id, display_name').in('id', missing);
   (data || []).forEach(p => S.profilesCache[p.id] = p.display_name);
 }
+/* 問い合わせの種類（inquiries.kind）。ボタンから来たものは kind で見分ける */
+const INQUIRY_KINDS = { question:'質問', trial:'体験セッション希望', consult:'構造コンサルティング相談' };
+const INQUIRY_FIRST_MSG = { trial:'体験セッションを希望します。', consult:'構造コンサルティングについて相談したいです。' };
 function inquiryCardHtml(i, msgs, isAdmin){
   const askerName = S.profilesCache[i.user_id] || '…';
   const resolved = i.status === 'resolved';
@@ -2115,7 +2143,7 @@ function inquiryCardHtml(i, msgs, isAdmin){
   }).join('');
   return `<div class="card q-card">
     <div class="q-card-head">
-      <div class="q-card-title">${isAdmin ? `<b>${esc(askerName)}</b>さんからの質問` : `あなたの質問`}</div>
+      <div class="q-card-title">${isAdmin ? `<b>${esc(askerName)}</b>さんからの${INQUIRY_KINDS[i.kind] || '質問'}` : `あなたの${INQUIRY_KINDS[i.kind] || '質問'}`}${isAdmin && i.contact ? `<div class="sub" style="font-size:13px;color:var(--gray);font-weight:400">連絡先：${esc(i.contact)}</div>` : ''}</div>
       <span class="q-status ${resolved ? 'q-status-resolved' : 'q-status-open'}">${resolved ? '解決済み' : '対応中'}</span>
       ${isAdmin ? `<button class="res-del" data-resolve="${i.id}" data-status="${i.status}">${resolved ? '対応中に戻す' : '解決済みにする'}</button>` : ''}
     </div>
@@ -2155,13 +2183,26 @@ async function renderChat(){
   });
 
   const inbox = S.current.type === 'inbox';
+  const quickHtml = (inbox && !isAdmin) ? `
+    <div class="card q-new">
+      <h3><span class="bar"></span>気軽にどうぞ</h3>
+      <p class="sub">ボタンを押すだけで大丈夫です。事務局からご連絡します。</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="ghost-btn" data-quick="trial">体験セッションを希望する</button><button class="ghost-btn" data-quick="consult">構造コンサルティングを相談する</button></div>
+      <div id="q-quick-form" hidden>
+        <p class="sub" style="margin-top:14px" id="q-quick-label"></p>
+        <label class="form-label">連絡先（任意）</label>
+        <input class="form-input" id="q-quick-contact" placeholder="普段見ているメールや電話番号" value="${esc(S.profile.contact_email || '')}">
+        <p class="sub" style="margin-top:6px">ログイン用のメールを普段見ない方は、ここに書いてください。空欄ならログイン用のメールにご連絡します。</p>
+        <button class="primary-btn" style="margin-top:10px" id="q-quick-send">送る</button>
+      </div>
+    </div>` : '';
   const newFormHtml = !isAdmin ? `
     <div class="card q-new">
       <h3><span class="bar"></span>${inbox ? '事務局に送る' : '事務局に質問する'}</h3>
       <p class="sub">${inbox
         ? 'ご質問、ご要望、感想、体験セッションのご希望など、なんでもどうぞ。ここに書いたことは、あなたと事務局だけが見られます。'
         : 'ここで送った質問は、あなたと事務局だけが見られます。'}</p>
-      <textarea class="form-input" id="q-new-body" rows="3" placeholder="${inbox ? '書きかけでも大丈夫です' : '聞きたいことを書いてください'}"></textarea>
+      <textarea class="form-input" id="q-new-body" rows="3" placeholder="${inbox ? 'ここに書いてください' : '聞きたいことを書いてください'}"></textarea>
       <button class="primary-btn" style="margin-top:10px" id="q-new-send">${inbox ? '送る' : '質問を送る'}</button>
     </div>` : '';
 
@@ -2169,7 +2210,36 @@ async function renderChat(){
     ? sorted.map(i => inquiryCardHtml(i, msgsByInquiry[i.id] || [], isAdmin)).join('')
     : `<div class="empty">${isAdmin ? 'まだ質問は届いていません' : 'まだ質問したことはありません'}</div>`;
 
-  $('page').innerHTML = `<div class="q-wrap">${newFormHtml}${listHtml}</div>`;
+  $('page').innerHTML = `<div class="q-wrap">${quickHtml}${newFormHtml}${listHtml}</div>`;
+
+  // 問い合わせボタン：押すと連絡先欄が出て、「送る」で窓口に1件できる（通知メールは DB のトリガーが出す）
+  let quickKind = null;
+  $('page').querySelectorAll('[data-quick]').forEach(el => el.onclick = () => {
+    quickKind = el.dataset.quick;
+    $('page').querySelectorAll('[data-quick]').forEach(b => b.classList.toggle('on', b === el));
+    $('q-quick-label').textContent = `「${INQUIRY_KINDS[quickKind]}」として事務局に送ります。`;
+    $('q-quick-form').hidden = false;
+    $('q-quick-contact').focus();
+  });
+  const qb = $('q-quick-send');
+  if (qb) qb.onclick = async () => {
+    if (!quickKind) return;
+    const contact = $('q-quick-contact').value.trim();
+    qb.disabled = true;
+    const { data: inq, error: e1 } = await supa.from('inquiries')
+      .insert({ room_id: roomId, user_id: S.user.id, kind: quickKind, contact: contact || null }).select().single();
+    if (e1) { qb.disabled = false; return toast('送信に失敗しました：' + e1.message); }
+    const { error: e2 } = await supa.from('inquiry_messages')
+      .insert({ inquiry_id: inq.id, sender_id: S.user.id, body: INQUIRY_FIRST_MSG[quickKind] });
+    qb.disabled = false;
+    if (e2) return toast('送信に失敗しました：' + e2.message);
+    if (contact && contact.includes('@') && contact !== S.profile.contact_email) {   // メールなら、次回のために覚えておく
+      const { error: e3 } = await supa.from('profiles').update({ contact_email: contact }).eq('id', S.user.id);
+      if (!e3) S.profile.contact_email = contact;
+    }
+    toast('送りました。事務局からご連絡します');
+    renderChat(); refreshInboxCount();
+  };
 
   // 相談者が開いたら「ここまで見た」を記録して、メニューの⭕️を消す（事務局側は返信した時点で消える）
   if (!isAdmin && ids.length) {
@@ -2757,19 +2827,21 @@ async function openHome(){
   $('page').innerHTML = greetHtml('') + `<div class="empty">読み込み中…</div>`;
   const roomName = id => S.rooms.find(r => r.id === id)?.name || '';
   // チャット機能は廃止したので messages は読まない（読むと去年の投稿が永遠に「新着」に出る）
-  const [vids, status, lessonItems] = await Promise.all([
+  const [vids, status, lessonItems, anns] = await Promise.all([
     supa.from('videos').select('*').order('created_at', { ascending:false }).limit(5),
     S.firstVisit ? Promise.resolve(null) : lessonsHomeStatus().catch(() => null),
     lessonsFeedItems().catch(() => []),
+    fetchAnnouncements(20),   // お知らせ（feed.js）
   ]);
   if (S.current?.type !== 'home') return;
   const items = [
     ...(vids.data || []).map(v => ({ t:v.created_at, kind:'vid', v })),
     ...(lessonItems || []),
-  ].sort((a,b) => b.t < a.t ? -1 : 1).slice(0, 12);
+    ...anns.map(p => ({ t:p.created_at, kind:'ann', html: announcementHtml(p) })),
+  ].sort((a,b) => b.t < a.t ? -1 : 1).slice(0, 20);
   const g2 = S.firstVisit ? t('はじめましょう。') : (status?.text || '');
-  $('page').innerHTML = greetHtml(g2, !!status?.go) + `<div class="card"><h3><span class="bar"></span>${t('新着')}</h3>
-    ${items.length ? items.map(i => i.kind === 'lesson' ? i.html : `
+  $('page').innerHTML = greetHtml(g2, !!status?.go) + `<div class="card"><h3><span class="bar"></span>${t('新着')}${canAnnounce() ? `<button class="ghost-btn" id="ann-new" style="margin:0 0 0 auto">＋ お知らせを書く</button>` : ''}</h3>
+    ${items.length ? items.map(i => (i.kind === 'lesson' || i.kind === 'ann') ? i.html : `
       <div class="feed-item">
         <div class="avatar">▶</div>
         <div class="feed-body">
@@ -2781,6 +2853,8 @@ async function openHome(){
   <p class="muted">${t('入っている場所で起きたことだけが、ここにまとまります。')}</p>`;
   const gg = $('greet-go'); if (gg) gg.onclick = e => { e.preventDefault(); status.go(); };
   $('page').querySelectorAll('[data-lesson-open]').forEach(el => el.onclick = () => openLessonById(el.dataset.lessonOpen));
+  bindAnnouncementActions();   // お知らせの削除・「＋ お知らせを書く」（feed.js）
+  markFeedSeen();              // ホームを開いた＝お知らせを見た（feed.js）
 }
 
 /* ================= 権限モーダル ================= */
@@ -2794,12 +2868,12 @@ $('me-btn').onclick = () => {
     S.rooms.map(r => {
       const role = roleIn(r.id);
       const label = role === 'admin' ? t('管理者') : role === 'editor' ? t('編集者') : role === 'member' ? t('メンバー') : t('未所属');
-      const can = role === 'admin' ? t('閲覧・投稿・編集・メンバー管理')
+      const canDo = role === 'admin' ? t('閲覧・投稿・編集・メンバー管理')
         : role === 'editor' ? t('閲覧・投稿・動画やリソースの追加編集')
         : role === 'member' ? t('閲覧・投稿') : '—';
       return `<tr><td><b>${esc(t(r.name))}</b></td>
         <td><span class="role-badge ${role ? '' : 'none'}">${label}</span></td>
-        <td style="font-size:11.5px">${can}</td></tr>`;
+        <td style="font-size:11.5px">${canDo}</td></tr>`;
     }).join('');
   $('role-modal').style.display = 'flex';
 };
