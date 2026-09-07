@@ -1251,16 +1251,12 @@ async function openCohortChat(c, opts = {}){
           <div class="lesson-bubble">${l.image_path ? `<div class="lb-img" data-img="${esc(l.image_path)}"></div>` : ''}<div class="lb-text">${esc(ex.slice(0, CHAT_EXCERPT))}${ex.length > CHAT_EXCERPT ? '…' : ''}</div><div class="lb-more">全文を読む →</div></div>
         </div></div>`;
     }
-    const x = it.x, mine = x.user_id === S.user.id, isEd = editors.includes(x.user_id);
-    const parent = x.parent_id ? byId[x.parent_id] : null;
-    return newMark + `<div class="msg ${mine ? 'mine' : ''}" id="c-${x.id}">
-      <div class="avatar cav ${isEd ? 'cav-ed' : ''}">${esc(initialOf(S.profilesCache[x.user_id]))}</div>
-      <div class="msg-body">
-        <div class="msg-head"><b>${esc(S.profilesCache[x.user_id] || '…')}</b>${isEd ? '<span class="cwho-ed" style="margin-left:6px">担当</span>' : ''}<span>${fmtWhen(x.created_at)}</span></div>
-        ${parent ? `<div class="msg-quote">↩ ${esc(S.profilesCache[parent.user_id] || '')}：${esc(plainText(parent.body).slice(0, 50))}</div>` : ''}
-        <div class="msg-text">${esc(x.body)}</div>
-        <div class="msg-tools"><button data-reply="${x.parent_id || x.id}" data-reply-name="${esc(S.profilesCache[x.user_id] || '')}">↩ 返信</button>${(mine || editor) ? `<button data-del="${x.id}">削除</button>` : ''}</div>
-      </div></div>`;
+    const x = it.x, mine = x.user_id === S.user.id;
+    return newMark + msgBubbleHtml(x, {   // 吹き出しは chat.js の共通部品
+      mine, isStaff: editors.includes(x.user_id), staffLabel: '担当',
+      parent: x.parent_id ? byId[x.parent_id] : null,
+      canDelete: mine || editor,
+    });
   }).join('');
 
   const latest = published[published.length - 1];
@@ -1305,42 +1301,26 @@ async function openCohortChat(c, opts = {}){
   $('page').querySelectorAll('[data-img]').forEach(async el => { const u = await lessonImageUrl(el.dataset.img); if (u) el.style.backgroundImage = `url("${u}")`; else el.remove(); });
   $('page').querySelectorAll('[data-open-lesson]').forEach(el => el.onclick = () => openLesson(L.lessons.find(l => l.id === el.dataset.openLesson)));
 
-  // 返信先
-  let replyTo = null;
-  const chip = $('reply-chip');
-  const setReply = (id, name) => {
-    replyTo = id;
-    if (!id) { chip.style.display = 'none'; chip.innerHTML = ''; return; }
-    chip.style.display = 'flex'; chip.innerHTML = `<span>↩ ${esc(name)}さんに返信</span><button id="reply-x">×</button>`;
-    $('reply-x').onclick = () => setReply(null);
-    $('chat-in').focus();
-  };
-  $('page').querySelectorAll('[data-reply]').forEach(el => el.onclick = () => setReply(el.dataset.reply, el.dataset.replyName));
-  $('page').querySelectorAll('[data-del]').forEach(el => el.onclick = async () => {
-    if (!confirm('このコメントを削除しますか？')) return;
-    const { error } = await supa.from('lesson_comments').update({ deleted_at: new Date().toISOString() }).eq('id', el.dataset.del);
-    if (error) return toast('削除に失敗しました：' + error.message);
-    openCohortChat(c, { keepScroll: true });
+  // 返信チップ・入力欄・送信は chat.js の共通部品
+  const { setReply } = setupComposer({
+    onSend: async (body, replyTo) => {
+      const lessonId = replyTo ? byId[replyTo]?.lesson_id || latest.id : latest.id;
+      const { error } = await supa.from('lesson_comments').insert({ lesson_id: lessonId, user_id: S.user.id, parent_id: replyTo || null, body });
+      if (error) { toast('送信に失敗しました：' + error.message); return false; }
+      if (editor && replyTo && L.queueMode) {
+        const n = await refreshQueueCount();
+        if (n && await openNextUnanswered(lessonId)) { toast(`返信しました。次の未返信へ（残り ${n}）`); return; }
+        L.queueMode = false; toast('返信しました。未返信はもうありません');
+      } else if (editor) refreshQueueCount();
+      openCohortChat(c, { keepScroll: true });
+    },
+    onDelete: async id => {
+      if (!confirm('このコメントを削除しますか？')) return;
+      const { error } = await supa.from('lesson_comments').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+      if (error) return toast('削除に失敗しました：' + error.message);
+      openCohortChat(c, { keepScroll: true });
+    },
   });
-
-  const ta = $('chat-in'), grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(120, ta.scrollHeight) + 'px'; };
-  ta.oninput = grow;
-  const post = async () => {
-    const body = ta.value.trim(); if (!body) return;
-    const lessonId = replyTo ? byId[replyTo]?.lesson_id || latest.id : latest.id;
-    const { error } = await supa.from('lesson_comments').insert({ lesson_id: lessonId, user_id: S.user.id, parent_id: replyTo || null, body });
-    if (error) return toast('送信に失敗しました：' + error.message);
-    ta.value = '';
-    const wasReply = replyTo; setReply(null);
-    if (editor && wasReply && L.queueMode) {
-      const n = await refreshQueueCount();
-      if (n && await openNextUnanswered(lessonId)) { toast(`返信しました。次の未返信へ（残り ${n}）`); return; }
-      L.queueMode = false; toast('返信しました。未返信はもうありません');
-    } else if (editor) refreshQueueCount();
-    openCohortChat(c, { keepScroll: true });
-  };
-  $('chat-send').onclick = post;
-  ta.onkeydown = e => enterToSend(e, post);
 
   // スクロール位置：指定があればそこへ、なければ一番下
   const sc = $('chat-scroll');
