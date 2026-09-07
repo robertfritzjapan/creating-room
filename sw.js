@@ -1,8 +1,10 @@
 /* Creating Room — Service Worker
    v19以降：ページ本体（HTML）はネットワーク優先（常に最新を取得、オフライン時のみキャッシュ）。
-   その他の静的ファイルはキャッシュ優先＋裏で更新（stale-while-revalidate）。 */
-const CACHE = 'creating-room-v35';
-const SHELL = ['./', './index.html', './manifest.webmanifest', './vendor/supabase.js', './lessons.js?v=1', './icons/icon-192.png', './icons/icon-512.png'];
+   その他の静的ファイルはキャッシュ優先＋裏で更新（stale-while-revalidate）。
+   v36：ページ本体の取得に cache:'no-cache' を付け、ブラウザ側の HTTP キャッシュも通り抜けて必ずサーバーに聞く。
+   lessons.js は index.html が ?v=N 付きで読むので、ここには書かない（初回表示時に自動でキャッシュされる）。 */
+const CACHE = 'creating-room-v36';
+const SHELL = ['./', './index.html', './manifest.webmanifest', './vendor/supabase.js', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)));
@@ -26,7 +28,7 @@ self.addEventListener('fetch', e => {
     e.respondWith(
       caches.open(CACHE).then(async cache => {
         try {
-          const res = await fetch(e.request);
+          const res = await fetch(e.request, { cache: 'no-cache' });
           if (res && res.ok) cache.put('./index.html', res.clone());
           return res;
         } catch (_) {
