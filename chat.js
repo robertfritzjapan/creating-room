@@ -58,6 +58,17 @@ function setupComposer(o){
   return { setReply };
 }
 
+/* 掲示板型の並べ方：親の投稿の直下に返信をぶら下げる（返信への返信も同じ段に並ぶ）。
+   list … {id, parent_id, created_at} の配列（時系列順）
+   戻り値 … [{x, cls}] の配列。返信は cls='msg-reply'（字下げ） */
+function threaded(list){
+  const ids = new Set(list.map(x => x.id));
+  const tops = list.filter(x => !x.parent_id || !ids.has(x.parent_id));
+  const kids = {};
+  list.filter(x => x.parent_id && ids.has(x.parent_id)).forEach(x => (kids[x.parent_id] = kids[x.parent_id] || []).push(x));
+  return tops.flatMap(t => [{ x: t, cls: '' }, ...(kids[t.id] || []).map(k => ({ x: k, cls: 'msg-reply' }))]);
+}
+
 /* ============================================================
    既読（last_seen）と未読の⭕️
    ============================================================ */
@@ -102,11 +113,6 @@ async function renderRoomChat(opts = {}){
   const byId = {}; posts.forEach(p => byId[p.id] = p);
   const moderator = can(roomId, 'moderate_chat');
 
-  // 掲示板型：親の投稿の直下に返信をぶら下げる（返信への返信も同じ段に並ぶ）
-  const tops = posts.filter(p => !p.parent_id || !byId[p.parent_id]);
-  const kids = {};
-  posts.filter(p => p.parent_id && byId[p.parent_id]).forEach(p => (kids[p.parent_id] = kids[p.parent_id] || []).push(p));
-
   let firstNew = false;
   const bubble = (p, cls) => {
     const isNew = p.created_at > seen && p.user_id !== S.user.id;
@@ -118,7 +124,7 @@ async function renderRoomChat(opts = {}){
       cls,
     });
   };
-  const html = tops.map(p => bubble(p) + (kids[p.id] || []).map(k => bubble(k, 'msg-reply')).join('')).join('');
+  const html = threaded(posts).map(({ x, cls }) => bubble(x, cls)).join('');   // 掲示板型（共通の threaded）
 
   const intro = room.pinned?.chat_intro;   // 「基本情報を編集」で設定する、先頭に固定の一言
   $('page').innerHTML = `<div class="chat-wrap" id="chat-wrap">
@@ -126,6 +132,7 @@ async function renderRoomChat(opts = {}){
         ${intro ? `<div class="chat-rule">${richText(intro)}</div>` : ''}
         ${posts.length ? html : `<div class="day-divider"><span>まだ投稿はありません。最初のひとことをどうぞ。</span></div>`}
       </div>
+      <div id="chat-people" class="muted" style="font-size:12px;padding:6px 14px 0;cursor:pointer">メンバーを見る ›</div>
       <div class="reply-chip" id="reply-chip" style="display:none"></div>
       <div class="chat-input"><textarea id="chat-in" rows="1" placeholder="ひとこと・質問・返信を書く…"></textarea><button class="send" id="chat-send">↑</button></div>
     </div>`;
@@ -143,6 +150,11 @@ async function renderRoomChat(opts = {}){
       renderRoomChat({ keepScroll: true });
     },
   });
+
+  // 入力欄の上の「メンバー n人 ›」：押すと基本情報タブのメンバー一覧へ
+  const cp = $('chat-people');
+  cp.onclick = () => { S.scrollPeople = true; showTab('pinned'); };
+  roomPeople(roomId).then(p => { const el = $('chat-people'); if (el) el.textContent = `メンバー ${p.members.length}人 ›`; });
 
   // スクロール位置：未読があればそこへ、なければ一番下（描き直しのときは元の位置）
   const sc = $('chat-scroll');
@@ -162,4 +174,30 @@ async function renderRoomChat(opts = {}){
       if (payload.new?.user_id === S.user.id) return;
       renderRoomChat({ keepScroll: true });
     }).subscribe();
+}
+
+/* ============================================================
+   部屋のメンバー一覧（21 Lessons の「参加者」と同じ見せ方）
+   名前だけを返す Supabase 関数 room_participants を使う（room-people.sql）
+   ============================================================ */
+const _roomPeopleCache = {};
+async function roomPeople(roomId, force){
+  if (!force && _roomPeopleCache[roomId]) return _roomPeopleCache[roomId];
+  const { data, error } = await supa.rpc('room_participants', { p_room: roomId });
+  if (error) { console.warn('room_participants', error.message); return { members: [], staff: [] }; }
+  const all = data || [];
+  const isStaff = x => PERMS.moderate_chat.includes(x.role);   // editor / admin ＝ 運営
+  const p = { staff: all.filter(isStaff), members: all.filter(x => !isStaff(x)) };
+  _roomPeopleCache[roomId] = p;
+  return p;
+}
+/* 基本情報タブの末尾に置くカード。fillRoomPeople で中身を入れる */
+const roomPeopleCardHtml = () =>
+  `<div class="card" id="rp-card"><h3><span class="bar"></span>メンバー<span class="muted" id="rp-n" style="margin-left:auto;font-weight:400"></span></h3><div id="rp-list" class="muted">読み込み中…</div></div>`;
+async function fillRoomPeople(roomId, scrollTo){
+  const p = await roomPeople(roomId, true);
+  const n = $('rp-n'), l = $('rp-list'); if (!n || !l) return;
+  n.textContent = `${p.members.length}人`;
+  l.className = ''; l.innerHTML = peopleHTML(p);   // peopleHTML は lessons.js（参加者＋運営の並べ方を共通にする）
+  if (scrollTo) $('rp-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
