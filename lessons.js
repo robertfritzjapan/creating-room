@@ -1233,10 +1233,13 @@ async function openCohortChat(c, opts = {}){
   const lastSeen = lastSeenOf(c.id);
   const cm = myCMFor(c.id);
 
-  const items = [
-    ...published.map(l => ({ t: l.publish_at, kind:'lesson', l })),
-    ...comments.map(x => ({ t: x.created_at, kind:'comment', x })),
-  ].sort((a,b) => a.t.localeCompare(b.t));
+  // Day ごとにまとめる：各 Day の吹き出しの下に、その Day へのコメントを掲示板型（返信は親の直下）で並べる
+  const byLesson = {};
+  comments.forEach(x => (byLesson[x.lesson_id] = byLesson[x.lesson_id] || []).push(x));
+  const items = published.flatMap(l => [
+    { t: l.publish_at, kind:'lesson', l },
+    ...threaded(byLesson[l.id] || []).map(({ x, cls }) => ({ t: x.created_at, kind:'comment', x, cls })),
+  ]);
 
   let firstNew = null;
   const html = items.map(it => {
@@ -1252,10 +1255,10 @@ async function openCohortChat(c, opts = {}){
         </div></div>`;
     }
     const x = it.x, mine = x.user_id === S.user.id;
-    return newMark + msgBubbleHtml(x, {   // 吹き出しは chat.js の共通部品
+    return newMark + msgBubbleHtml(x, {   // 吹き出しは chat.js の共通部品。返信は親の直下に字下げで出るので引用は付けない
       mine, isStaff: editors.includes(x.user_id), staffLabel: '担当',
-      parent: x.parent_id ? byId[x.parent_id] : null,
       canDelete: mine || editor,
+      cls: it.cls,
     });
   }).join('');
 
