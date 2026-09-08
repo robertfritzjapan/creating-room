@@ -672,7 +672,8 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
     <label class="form-label">「基本情報」タブの名前（任意）</label>
     <input class="form-input" id="inf-tablabel" placeholder="空欄なら「基本情報」　例：はじめに、ご案内、この部屋について">
     <div class="inf-chat"><label class="form-label">チャットの先頭に出す一言（任意）</label>
-    <textarea class="form-input" id="inf-chatintro" rows="2" placeholder="例：ここは MMOT の練習相手を探したり、やってみた感想を話す場所です"></textarea></div>
+    <textarea class="form-input" id="inf-chatintro" rows="2" placeholder="例：ここは MMOT の練習相手を探したり、やってみた感想を話す場所です"></textarea>
+    <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="inf-membersg"> メンバーも受付を立てられる（立てた人が主催者。自分の受付だけ直せます）</label></div>
     <label class="form-label">受付の見出し（任意）</label>
     <input class="form-input" id="inf-sgtitle" placeholder="空欄なら「参加希望の受付」　例：ミニレクチャー参加の受付">
     <div class="inf-full">
@@ -940,7 +941,7 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
 <div id="toast"></div>
 
 <script src="vendor/supabase.js"></script>
-<script src="chat.js?v=1"></script>
+<script src="chat.js?v=2"></script>
 <script src="feed.js?v=1"></script>
 <script src="lessons.js?v=5"></script>
 <script>
@@ -1676,7 +1677,7 @@ async function renderPinned(opts = {}){
     if (sgs.length) {
       const { data: rd } = await supa.from('signup_responses').select('*').in('signup_id', sgs.map(s => s.id));
       sgResp = rd || [];
-      await ensureNames(sgResp.map(r => r.user_id));
+      await ensureNames([...sgResp.map(r => r.user_id), ...sgs.map(s => s.created_by)].filter(Boolean));
     }
   }
   if (S.current.room !== room) return;   // 読み込み中にルームが変わったら破棄
@@ -1701,14 +1702,19 @@ async function renderPinned(opts = {}){
     </div>`);
   }
   // 参加希望の受付は、その日に動くもの。Zoom やスケジュールより先に出す
-  if (!sgErr && !fold && !bare && (sgs.length || editor) && !isEntranceRoom(room)) {   // チャート画面には出さない（Creating ノートの基本情報タブ側にある）
-    h += `<div class="card sg-card"><h3><span class="bar"></span>🙋 ${esc(p.signup_title || '参加希望の受付')}${editor ? `<span style="margin-left:auto"><button class="res-del" id="add-signup" title="受付を追加">＋ 追加</button></span>` : ''}</h3>
+  // メンバーも受付を立てられる部屋（基本情報を編集 → チェック）：立てた本人が主催者で、自分の受付だけ直せる
+  const memberSg = !!p.member_signups && isMember(room.id);
+  const canAddSg = editor || memberSg;
+  const canManageSg = s => editor || (memberSg && s.created_by === S.user.id);
+  if (!sgErr && !fold && !bare && (sgs.length || canAddSg) && !isEntranceRoom(room)) {   // チャート画面には出さない（Creating ノートの基本情報タブ側にある）
+    h += `<div class="card sg-card"><h3><span class="bar"></span>🙋 ${esc(p.signup_title || '参加希望の受付')}${canAddSg ? `<span style="margin-left:auto"><button class="res-del" id="add-signup" title="受付を追加">＋ ${editor ? '追加' : '受付をはじめる'}</button></span>` : ''}</h3>
       ${sgs.length ? sgs.map(s => {
         const rs = sgResp.filter(r => r.signup_id === s.id);
         const mine = rs.some(r => r.user_id === S.user.id);
         return `<div class="sg-item">
           <div class="sg-head"><b>${esc(s.title)}</b>${s.event_date || s.event_time
-            ? `<span class="sg-date">${s.event_date ? fmtDay(s.event_date) : ''}${s.event_time ? ` <b>${esc(String(s.event_time).slice(0, 5))}</b>〜` : ''}</span>` : ''}${editor ? `<button class="res-del" data-sg-edit="${s.id}" title="日時や文言を直す">✏️</button><button class="res-del" data-sg-del="${s.id}" title="受付を終了して削除">✕</button>` : ''}</div>
+            ? `<span class="sg-date">${s.event_date ? fmtDay(s.event_date) : ''}${s.event_time ? ` <b>${esc(String(s.event_time).slice(0, 5))}</b>〜` : ''}</span>` : ''}${canManageSg(s) ? `<button class="res-del" data-sg-edit="${s.id}" title="日時や文言を直す">✏️</button><button class="res-del" data-sg-del="${s.id}" title="受付を終了して削除">✕</button>` : ''}</div>
+          ${memberSg && s.created_by ? `<div class="muted" style="font-size:13px">主催：${esc(S.profilesCache[s.created_by] || '…')}</div>` : ''}
           ${s.note ? `<div class="sg-note">${richText(s.note)}</div>` : ''}
           <div class="sg-status">現在 <b>${rs.length}</b> 人が参加希望${rs.length ? `：${rs.map(r => esc(S.profilesCache[r.user_id] || '…')).join('、')}` : ''}</div>
           <button class="add-res-btn sg-btn ${mine ? 'on' : ''}" data-sg-join="${s.id}" data-mine="${mine ? '1' : ''}">${mine ? '✓ 参加希望済み（タップで取り消し）' : '🙋 参加したい'}</button>
@@ -1775,8 +1781,10 @@ async function renderPinned(opts = {}){
       <div class="sec-text" style="font-size:16px;line-height:1.9">${richText(s.body)}</div>
     </div>`;
   });
+  if (isToolRoom(room)) h += roomPeopleCardHtml();   // ツールの部屋：誰がいるかを 21 Lessons と同じ形で出す（chat.js）
   $('page').innerHTML = h || `<div class="empty">${bare ? 'ご案内はまだありません' : t('基本情報はまだありません')}</div>`;
   bindCopyBoxes($('page'));
+  if (isToolRoom(room)) { fillRoomPeople(room.id, S.scrollPeople); S.scrollPeople = false; }
   const ei = $('edit-info'); if (ei) ei.onclick = openInfoModal;
   const ea = $('edit-about'); if (ea) ea.onclick = () => openAboutModal(room);
   const as = $('add-sec'); if (as) as.onclick = () => openSecModal(null);
@@ -1853,6 +1861,7 @@ function openInfoModal(){
   $('inf-sgtitle').value = p.signup_title || '';
   $('inf-tablabel').value = p.tab_label || '';
   $('inf-chatintro').value = p.chat_intro || '';
+  $('inf-membersg').checked = !!p.member_signups;
   document.querySelectorAll('#info-modal .inf-chat').forEach(el => el.style.display = isToolRoom(room) ? '' : 'none');   // チャットがある部屋だけ
   // 道具の部屋（今日をつくる）は、画面に出るものだけ編集できるようにする
   const simple = room.kind === 'tool';
@@ -1888,6 +1897,7 @@ $('info-save').onclick = async () => {
   if (!pinned.tab_label) delete pinned.tab_label;
   pinned.chat_intro = $('inf-chatintro').value.trim();
   if (!pinned.chat_intro) delete pinned.chat_intro;
+  if ($('inf-membersg').checked) pinned.member_signups = true; else delete pinned.member_signups;
   pinned.gcal = $('inf-gcal').value.split(/[\n,]+/).map(l => {
     const m = l.match(/[?&]src=([^&\s]+)/);
     return (m ? decodeURIComponent(m[1]) : l).trim();
