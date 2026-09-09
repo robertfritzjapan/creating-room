@@ -1238,7 +1238,8 @@ function leaveChat(){ if (S.chatChannel) { supa.removeChannel(S.chatChannel); S.
 
 function updatePinBtn(){
   const btn = $('pin-btn');
-  if (S.current?.type !== 'room') { btn.style.display = 'none'; return; }
+  // 部屋の中（21 Lessons の期のチャットやレッスン本文も含む）で出す。押すと、その部屋がログイン後の最初の画面になる
+  if (!['room','cohort','lesson'].includes(S.current?.type) || !S.current?.room) { btn.style.display = 'none'; return; }
   btn.style.display = 'inline';
   btn.classList.toggle('on', S.profile.default_room === S.current.room.id);
 }
