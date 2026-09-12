@@ -279,6 +279,11 @@ a{color:var(--ai)}
 .login-consent input{margin-top:4px;width:16px;height:16px;flex-shrink:0}
 .login-consent a{color:var(--gray);text-decoration:underline}
 .login-links a{color:var(--gray);text-decoration:underline;margin:0 6px}
+.about-links{margin-top:auto;padding:18px 24px 6px;border-top:1px solid #2a2a2d;font-size:11.5px;line-height:1.9}
+.about-links .al-head{color:#77777d;font-size:10.5px;margin-bottom:4px;line-height:1.5}
+.about-links a{display:block;color:#a9a9ae;text-decoration:none}
+.about-links a:hover{color:#fff}
+.about-links a::before{content:'↗ ';color:#77777d;font-size:10px}
 .side-links{padding:8px 24px 0;font-size:10.5px;color:#77777d;line-height:1.8}
 .side-links a{color:#77777d;text-decoration:none}
 .side-links a:hover{color:#c9c9cf;text-decoration:underline}
@@ -617,6 +622,12 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
   <aside class="sidebar" id="sidebar">
     <div class="logo"><b>Creating</b> Room<small>ROBERT FRITZ CONSULTING</small></div>
     <div id="nav"></div>
+    <div class="about-links" id="about-links">
+      <div class="al-head">Creating Room は （株）Robert Fritz Consulting が運営しています</div>
+      <a href="https://robertfritzjapan.com" target="_blank" rel="noopener">Robert Fritz Consulting 公式サイト</a>
+      <a href="https://members.robertfritzjapan.com" target="_blank" rel="noopener">Creating スクエア</a>
+      <a href="https://school.robertfritzjapan.com" target="_blank" rel="noopener">Fritz Business School</a>
+    </div>
     <div class="logout" id="logout-btn">ログアウト</div>
     <div class="side-links"><a href="https://robertfritzjapan.com/privacy-policy" target="_blank" rel="noopener">プライバシーポリシー</a> ・ <a href="https://robertfritzjapan.com/commercial-disclosure" target="_blank" rel="noopener">特定商取引法に基づく表記</a></div>
     <div class="me" id="me-btn">
