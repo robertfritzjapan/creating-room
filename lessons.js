@@ -35,12 +35,10 @@ const fmtWhen = iso => {
 const nl2br = t => esc(t || '').replace(/\n/g, '<br>');
 const errBox = e => `<div class="empty">読み込みに失敗しました<br><span style="font-size:11px;color:#999">${esc(e?.code || '')} ${esc(e?.message || '')}</span></div>`;
 
-/* ---------- 起動時に呼ぶ（index.html の start() から） ---------- */
-async function lessonsBootstrap(){
-  const [c, m] = await Promise.all([
-    supa.from('cohorts').select('*').order('sort_order').order('starts_on', { ascending:false }),
-    supa.from('cohort_members').select('*').eq('user_id', S.user.id),
-  ]);
+/* ---------- 起動時に呼ぶ（index.html の start() から） ----------
+   c（期）と m（自分の参加）は start() が他の問い合わせと一緒にまとめて取ってきたものを受け取る。
+   ここで取りに行かないのは、そのぶんサーバーへの往復が1回増えるから。 */
+function lessonsBootstrap(c, m){
   L.cohorts = c.data || [];
   L.myCM = m.data || [];
   L.editorRooms = S.memberships.filter(x => PERMS.edit_lessons.includes(x.role)).map(x => x.room_id);
