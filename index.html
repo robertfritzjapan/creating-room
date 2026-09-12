@@ -954,7 +954,7 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
 <script src="vendor/supabase.js"></script>
 <script src="chat.js?v=3"></script>
 <script src="feed.js?v=1"></script>
-<script src="lessons.js?v=6"></script>
+<script src="lessons.js?v=7"></script>
 <script>
 /* ================= 設定 ================= */
 if (!window.supabase) { document.getElementById('boot').textContent = '読み込みに失敗しました。再読み込みしてください。'; throw new Error('supabase-js not loaded'); }
@@ -1066,10 +1066,13 @@ async function start(){
   $('app').style.display = 'flex';
   try {
     const uid = S.user.id;
-    const [p, r, m] = await Promise.all([
+    // 起動に必要なものは一度にまとめて取る（1つずつ順番に待つと、その回数だけ表示が遅れる）
+    const [p, r, m, co, cm] = await Promise.all([
       supa.from('profiles').select('*').eq('id', uid).single(),
       supa.from('rooms').select('*').order('sort_order'),
       supa.from('memberships').select('*').eq('user_id', uid),
+      supa.from('cohorts').select('*').order('sort_order').order('starts_on', { ascending:false }),
+      supa.from('cohort_members').select('*').eq('user_id', uid),
     ]);
     if (p.error) throw p.error;
     S.profile = p.data;
@@ -1084,7 +1087,7 @@ async function start(){
         .insert(autoRooms.map(x => ({ user_id: uid, room_id: x.id, role: 'member' })));
       if (!je) { const { data: mm } = await supa.from('memberships').select('*').eq('user_id', uid); S.memberships = mm || S.memberships; }
     }
-    await lessonsBootstrap();   // 21 Lessons：期と自分の参加を読む（lessons.js）
+    lessonsBootstrap(co, cm);   // 21 Lessons：上でまとめて取った期と参加を渡す（lessons.js）
     renderMe(); renderNav();
     refreshChatUnread();        // 部屋チャットの未読⭕️（chat.js）。待たずに進む
     refreshFeedUnread();        // 新着フィードの未読（feed.js）。待たずに進む
