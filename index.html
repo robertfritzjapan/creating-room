@@ -2222,15 +2222,15 @@ async function renderChat(){
     <div class="card q-new">
       <h3><span class="bar"></span>${inbox ? '事務局に送る' : '事務局に質問する'}</h3>
       <p class="sub">${inbox
-        ? 'ご質問、ご要望、感想、体験セッションのご希望など、なんでもどうぞ。ここに書いたことは、あなたと事務局だけが見られます。'
+        ? 'ご質問、「もっとこんな情報が欲しい」「ここが使いにくい」といったリクエストやフィードバックなど、なんでもどうぞ。どの部屋の方からでも歓迎です。ここに書いたことは、あなたと事務局だけが見られます。'
         : 'ここで送った質問は、あなたと事務局だけが見られます。'}</p>
-      <textarea class="form-input" id="q-new-body" rows="3" placeholder="${inbox ? 'ここに書いてください' : '聞きたいことを書いてください'}"></textarea>
+      <textarea class="form-input" id="q-new-body" rows="3" placeholder="${inbox ? '質問・リクエスト・フィードバック、なんでもここに書いてください' : '聞きたいことを書いてください'}"></textarea>
       <button class="primary-btn" style="margin-top:10px" id="q-new-send">${inbox ? '送る' : '質問を送る'}</button>
     </div>` : '';
 
   const listHtml = sorted.length
     ? sorted.map(i => inquiryCardHtml(i, msgsByInquiry[i.id] || [], isAdmin)).join('')
-    : `<div class="empty">${isAdmin ? 'まだ質問は届いていません' : 'まだ質問したことはありません'}</div>`;
+    : `<div class="empty">${isAdmin ? 'まだ何も届いていません' : (inbox ? 'まだ送ったものはありません' : 'まだ質問したことはありません')}</div>`;
 
   $('page').innerHTML = `<div class="q-wrap">${quickHtml}${newFormHtml}${listHtml}</div>`;
 
