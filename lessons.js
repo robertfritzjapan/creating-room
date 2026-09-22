@@ -197,7 +197,7 @@ async function cohortPeople(c, force){
   // 編集者が cohort_members に居なければ profiles から名前を取る
   const missing = edIds.filter(id => !staff.some(p => p.user_id === id));
   if (missing.length) {
-    const { data: ps } = await supa.from('profiles').select('id, display_name').in('id', missing);
+    const { data: ps } = await supa.from('profiles_public').select('id, display_name').in('id', missing);
     staff = staff.concat((ps || []).map(p => ({ user_id: p.id, display_name: p.display_name })));
   }
   const r = { members, staff };
