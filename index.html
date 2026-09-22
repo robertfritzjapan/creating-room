@@ -957,7 +957,7 @@ details.sec-more .sec-body{font-size:15.5px;line-height:1.95;margin-top:8px;
 <script src="vendor/supabase.js"></script>
 <script src="chat.js?v=3"></script>
 <script src="feed.js?v=1"></script>
-<script src="lessons.js?v=7"></script>
+<script src="lessons.js?v=8"></script>
 <script>
 /* ================= 設定 ================= */
 if (!window.supabase) { document.getElementById('boot').textContent = '読み込みに失敗しました。再読み込みしてください。'; throw new Error('supabase-js not loaded'); }
@@ -1063,6 +1063,13 @@ supa.auth.onAuthStateChange((_event, session) => {
 })();
 
 /* ================= 起動 ================= */
+/* 基本情報（rooms.pinned だったもの）を room_details から読んで、各部屋の .pinned に載せる */
+async function loadRoomDetails(){
+  const { data } = await supa.from('room_details').select('room_id, pinned');
+  const det = {}; (data || []).forEach(x => det[x.room_id] = x.pinned);
+  S.rooms.forEach(r => r.pinned = det[r.id] || null);
+  if (S.current?.room) S.current.room.pinned = det[S.current.room.id] || null;
+}
 async function start(){
   $('login').style.display = 'none';
   $('boot').style.display = 'none';
@@ -1090,6 +1097,8 @@ async function start(){
         .insert(autoRooms.map(x => ({ user_id: uid, room_id: x.id, role: 'member' })));
       if (!je) { const { data: mm } = await supa.from('memberships').select('*').eq('user_id', uid); S.memberships = mm || S.memberships; }
     }
+    // 基本情報（Zoom・コンタクト・セクション等）は room_details にあり、入っている部屋の分だけ読める
+    await loadRoomDetails();
     lessonsBootstrap(co, cm);   // 21 Lessons：上でまとめて取った期と参加を渡す（lessons.js）
     renderMe(); renderNav();
     refreshChatUnread();        // 部屋チャットの未読⭕️（chat.js）。待たずに進む
@@ -1841,7 +1850,7 @@ async function renderPinned(opts = {}){
     if (at < 0 || to === undefined) return;
     const pinned = structuredClone(S.current.room.pinned || {});
     [pinned.sections[idx], pinned.sections[to]] = [pinned.sections[to], pinned.sections[idx]];
-    const { error } = await supa.from('rooms').update({ pinned }).eq('id', S.current.room.id);
+    const { error } = await supa.from('room_details').upsert({ room_id: S.current.room.id, pinned }, { onConflict: 'room_id' });
     if (error) return toast('並べ替えできませんでした');
     S.current.room.pinned = pinned;
     const r = S.rooms.find(x => x.id === S.current.room.id); if (r) r.pinned = pinned;
@@ -1857,7 +1866,7 @@ async function renderPinned(opts = {}){
   });
 }
 async function savePinned(pinned){
-  const { error } = await supa.from('rooms').update({ pinned }).eq('id', S.current.room.id);
+  const { error } = await supa.from('room_details').upsert({ room_id: S.current.room.id, pinned }, { onConflict: 'room_id' });
   if (error) { toast('保存に失敗しました：' + error.message); return false; }
   S.current.room.pinned = pinned;
   const r = S.rooms.find(x => x.id === S.current.room.id);
@@ -2149,7 +2158,7 @@ function drawArchive(){
 async function ensureNames(userIds){
   const missing = [...new Set(userIds)].filter(id => !(id in S.profilesCache));
   if (!missing.length) return;
-  const { data } = await supa.from('profiles').select('id, display_name').in('id', missing);
+  const { data } = await supa.from('profiles_public').select('id, display_name').in('id', missing);
   (data || []).forEach(p => S.profilesCache[p.id] = p.display_name);
 }
 /* 問い合わせの種類（inquiries.kind）。ボタンから来たものは kind で見分ける */
