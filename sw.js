@@ -3,7 +3,7 @@
    その他の静的ファイルはキャッシュ優先＋裏で更新（stale-while-revalidate）。
    v36：ページ本体の取得に cache:'no-cache' を付け、ブラウザ側の HTTP キャッシュも通り抜けて必ずサーバーに聞く。
    lessons.js は index.html が ?v=N 付きで読むので、ここには書かない（初回表示時に自動でキャッシュされる）。 */
-const CACHE = 'creating-room-v36';
+const CACHE = 'creating-room-v37';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './vendor/supabase.js', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => {
